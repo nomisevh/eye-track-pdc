@@ -134,3 +134,4 @@ data/*.pth
 data/*.pkl
 local/
 data/ki/*
+.csv
