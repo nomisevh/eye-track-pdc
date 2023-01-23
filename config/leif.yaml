@@ -1,0 +1,14 @@
+sanitation:
+  position_thresholds:
+    max_value: 3.0
+    snr: 3.0
+    mean_vel: 0.3
+  drift_thresholds:
+    max_value: 3.0
+    snr: 3.0
+    mean_vel: 0.3
+file_normalization:
+  trailing_window_width: 10
+segmentation:
+  post_saccade_time_threshold: 1
+  exclude_first: true
