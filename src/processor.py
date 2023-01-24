@@ -19,6 +19,7 @@ class DataProcessor(ABC):
     def __call__(self, frames: List[DataFrame], **kwargs) -> List[List[DataFrame]]:
         """
         Processes and segments a multivariate time series (MTS)
+
         :param frames: A list containing dataframes which hold the MTS
         :param kwargs: Any processor-specific arguments
         :return: A list holding all the processed and segmented MTS
@@ -33,6 +34,7 @@ class FileProcessor(ABC):
     def __call__(self, frames: List[DataFrame], **kwargs) -> List[DataFrame]:
         """
         Processes a list of multivariate time series (MTS)
+
         :param frames: A list containing dataframes which hold the MTS
         :param kwargs: Any processor-specific arguments
         :return: A list holding the processed MTS
@@ -46,6 +48,7 @@ class Scissor(ABC):
     def __call__(self, frame: DataFrame, **kwargs) -> List[DataFrame]:
         """
         Segments a multivariate time series (MTS)
+
         :param frame: A dataframe holding the MTS
         :param kwargs: Any processor-specific arguments
         :return: A list holding the segmented MTS
@@ -59,6 +62,7 @@ class SegmentProcessor(ABC):
     def __call__(self, frames: DataFrame, **kwargs) -> DataFrame:
         """
         Processes a segment of a multivariate time series (MTS)
+
         :param frames: A dataframes holding the MTS segment
         :param kwargs: Any processor-specific arguments
         :return: The processed MTS segment
@@ -162,6 +166,7 @@ class FileFilter(FileProcessor):
         """
         Filter the frames by max value, signal-to-noise ratio and mean velocity. The filter is applied with respect to
         the position and the drift independently.
+        
         :param frames: A list holding the dataframes to be filtered
         """
         for header, thresholds in zip(FileFilter.SERIES_HEADERS, [self.position_thresholds, self.drift_thresholds]):
