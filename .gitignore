@@ -134,4 +134,8 @@ data/*.pth
 data/*.pkl
 local/
 data/ki/*
+data/KI/*
+data/KI
+data/FordA
 .csv
+

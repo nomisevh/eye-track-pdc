@@ -1,69 +1,80 @@
 """
 This file hosts our data preprocessing pipeline including sanitation, normalization, segmentation.
 """
-import abc
-from abc import ABC
 from typing import List
 
 import numpy as np
 from numpy import finfo
 from pandas import DataFrame
 
+from ifaces.data import DataProcessor, FileProcessor, Scissor
 from utils.data import ZScoreFilter
 from utils.ki import SAMPLE_RATE
 
 
-class DataProcessor(ABC):
+class FileFilter(FileProcessor):
+    """
+    Filters files based on z scores on a number of heuristics.
+    """
+    SERIES_HEADERS = ['position', 'drift']
 
-    @abc.abstractmethod
-    def __call__(self, frames: List[DataFrame], **kwargs) -> List[List[DataFrame]]:
-        """
-        Processes and segments a multivariate time series (MTS)
-        :param frames: A list containing dataframes which hold the MTS
-        :param kwargs: Any processor-specific arguments
-        :return: A list holding all the processed and segmented MTS
-        """
-        raise NotImplementedError
+    def __init__(self, *, position_threshold, drift_thresholds):
+        self.position_thresholds = position_threshold.values()
+        self.drift_thresholds = drift_thresholds.values()
 
-
-# TODO File / Trial / something else?
-class FileProcessor(ABC):
-
-    @abc.abstractmethod
     def __call__(self, frames: List[DataFrame], **kwargs) -> List[DataFrame]:
         """
-        Processes a list of multivariate time series (MTS)
-        :param frames: A list containing dataframes which hold the MTS
-        :param kwargs: Any processor-specific arguments
-        :return: A list holding the processed MTS
+        Filter the frames by max value, signal-to-noise ratio and mean velocity. The filter is applied with respect to
+        the position and the drift independently.
+        :param frames: A list holding the dataframes to be filtered
         """
-        raise NotImplementedError
+        for header, thresholds in zip(FileFilter.SERIES_HEADERS, [self.position_thresholds, self.drift_thresholds]):
+            series = [df[header] for df in frames]
+            heuristics = {
+                # OBS I now added the abs before max which wasn't there before
+                'max value': [s.abs().max() for s in series],
+                'snr': [s.abs().max() / (s.var() + finfo(float).eps) for s in series],
+                # TODO (low prio) we could compute the velocity before this point and use that. That way we would
+                #  avoid computing diff here AND later when adding the velocity channel.
+                'mean velocity': [s.diff().fillna(0).abs().mean(axis=0) for s in series]
+            }
+
+            for (h_name, h_values), threshold in zip(heuristics.items(), thresholds):
+                z_filter = ZScoreFilter(threshold)
+                n_before = len(frames)
+                # Filter all remaining frames based on the computed heuristic
+                frames = [f for f, support in zip(frames, h_values) if not z_filter(support)]
+                print(f'skipped {len(frames) - n_before} frames ({header} {h_name} outlier)')
+
+        return frames
 
 
-class Scissor(ABC):
+class FixationScissor(Scissor):
+    """
+    Segments a file such that the segments capture the periods where the individual is focusing in between saccades.
+    """
 
-    @abc.abstractmethod
-    def __call__(self, frame: DataFrame, **kwargs) -> List[DataFrame]:
-        """
-        Segments a multivariate time series (MTS)
-        :param frame: A dataframe holding the MTS
-        :param kwargs: Any processor-specific arguments
-        :return: A list holding the segmented MTS
-        """
-        raise NotImplementedError
+    def __init__(self, *, sample_rate: int, post_saccade_time_threshold: float, exclude_first: bool = True):
+        self.sample_rate = sample_rate
+        self.d = post_saccade_time_threshold
+        self.exclude_first = exclude_first
 
+    def __call__(self, frame: DataFrame, target_col:str='target', **kwargs) -> List[DataFrame]:
+        th = int(self.sample_rate * self.d)
 
-class SegmentProcessor(ABC):
+        target = frame["target"]
+        anchors = [0, *target[target.diff().fillna(0) != 0].index.tolist()]
+        segments = []
+        for i in range(0, len(anchors) - 1, 2):
+            s = frame.iloc[anchors[i] + th:anchors[i + 1], :].copy()
+            # Add the initial timestamp of the segment
+            start_time = s["Time (ms)"].iloc[0]
+            s["Time (ms)"] -= start_time
+            s.reset_index(drop=True, inplace=True)
+            # Place the segment in the returning list
+            segments.append(s)
 
-    @abc.abstractmethod
-    def __call__(self, frames: DataFrame, **kwargs) -> DataFrame:
-        """
-        Processes a segment of a multivariate time series (MTS)
-        :param frames: A dataframes holding the MTS segment
-        :param kwargs: Any processor-specific arguments
-        :return: The processed MTS segment
-        """
-        raise NotImplementedError
+        return segments[(1 if self.exclude_first else 0):]
 
 
 class Leif(DataProcessor):
@@ -75,7 +86,7 @@ class Leif(DataProcessor):
         self.train = train
         self.sanitizer = FileFilter(**config['sanitation'])
         self.file_normalizer = SaccadeAmplitudeNormalizer(**config['file_normalization'])
-        self.scissor = FocusScissor(sample_rate=SAMPLE_RATE, **config['segmentation'])
+        self.scissor = FixationScissor(sample_rate=SAMPLE_RATE, **config['segmentation'])
 
     def __call__(self, frames: List[DataFrame], **kwargs) -> List[DataFrame]:
         # TODO should we sanitize at all if test?
@@ -146,68 +157,3 @@ class SaccadeAmplitudeNormalizer(FileProcessor):
 
         print(f"skipped {skipped} files (no target movement)")
         return frames
-
-
-class FileFilter(FileProcessor):
-    """
-    Filters files based on z scores on a number of heuristics.
-    """
-    SERIES_HEADERS = ['position', 'drift']
-
-    def __init__(self, *, position_threshold, drift_thresholds):
-        self.position_thresholds = position_threshold.values()
-        self.drift_thresholds = drift_thresholds.values()
-
-    def __call__(self, frames: List[DataFrame], **kwargs) -> List[DataFrame]:
-        """
-        Filter the frames by max value, signal-to-noise ratio and mean velocity. The filter is applied with respect to
-        the position and the drift independently.
-        :param frames: A list holding the dataframes to be filtered
-        """
-        for header, thresholds in zip(FileFilter.SERIES_HEADERS, [self.position_thresholds, self.drift_thresholds]):
-            series = [df[header] for df in frames]
-            heuristics = {
-                # OBS I now added the abs before max which wasn't there before
-                'max value': [s.abs().max() for s in series],
-                'snr': [s.abs().max() / (s.var() + finfo(float).eps) for s in series],
-                # TODO (low prio) we could compute the velocity before this point and use that. That way we would
-                #  avoid computing diff here AND later when adding the velocity channel.
-                'mean velocity': [s.diff().fillna(0).abs().mean(axis=0) for s in series]
-            }
-
-            for (h_name, h_values), threshold in zip(heuristics.items(), thresholds):
-                z_filter = ZScoreFilter(threshold)
-                n_before = len(frames)
-                # Filter all remaining frames based on the computed heuristic
-                frames = [f for f, support in zip(frames, h_values) if not z_filter(support)]
-                print(f'skipped {len(frames) - n_before} frames ({header} {h_name} outlier)')
-
-        return frames
-
-
-class FocusScissor(Scissor):
-    """
-    Segments a file such that the segments capture the periods where the individual is focusing in between saccades.
-    """
-
-    def __init__(self, *, sample_rate, post_saccade_time_threshold, exclude_first):
-        self.sample_rate = sample_rate
-        self.d = post_saccade_time_threshold
-        self.exclude_first = exclude_first
-
-    def __call__(self, frame: DataFrame, **kwargs) -> List[DataFrame]:
-        th = int(self.sample_rate * self.d)
-
-        target = frame["target"]
-        anchors = [0, *target[target.diff().fillna(0) != 0].index.tolist()]
-        segments = []
-        for i in range(0, len(anchors) - 1, 2):
-            s = frame.iloc[anchors[i] + th:anchors[i + 1], :].copy()
-            # Add the initial timestamp of the segment
-            start_time = s["Time (ms)"].iloc[0]
-            s["Time (ms)"] -= start_time
-            s.reset_index(drop=True, inplace=True)
-            # Place the segment in the returning list
-            segments.append(s)
-
-        return segments[(1 if self.exclude_first else 0):]
