@@ -139,3 +139,4 @@ data/KI
 data/FordA
 .csv
 
+src/dataset/*.pdf
