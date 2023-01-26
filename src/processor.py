@@ -8,8 +8,9 @@ from typing import List
 import numpy as np
 from numpy import finfo
 from pandas import DataFrame
+from tqdm import tqdm
 
-from utils.data import ZScoreFilter
+from utils.data import ZScoreMask
 from utils.ki import SAMPLE_RATE
 
 
@@ -125,7 +126,7 @@ class SaccadeAmplitudeNormalizer(FileProcessor):
     def __call__(self, frames: List[DataFrame], **kwargs) -> List[DataFrame]:
         skipped = 0
 
-        for i in range(len(frames)):
+        for i in tqdm(range(len(frames)), desc='Normalizing files'):
             target = frames[i]["target"]
             target_diff = target.diff().fillna(0)
             anchors = [*target[target_diff != 0].index.tolist()]
@@ -158,8 +159,8 @@ class FileFilter(FileProcessor):
     """
     SERIES_HEADERS = ['position', 'drift']
 
-    def __init__(self, *, position_threshold, drift_thresholds):
-        self.position_thresholds = position_threshold.values()
+    def __init__(self, *, position_thresholds, drift_thresholds):
+        self.position_thresholds = position_thresholds.values()
         self.drift_thresholds = drift_thresholds.values()
 
     def __call__(self, frames: List[DataFrame], **kwargs) -> List[DataFrame]:
@@ -169,7 +170,8 @@ class FileFilter(FileProcessor):
 
         :param frames: A list holding the dataframes to be filtered
         """
-        for header, thresholds in zip(FileFilter.SERIES_HEADERS, [self.position_thresholds, self.drift_thresholds]):
+        iterator = zip(FileFilter.SERIES_HEADERS, [self.position_thresholds, self.drift_thresholds])
+        for header, thresholds in iterator:
             series = [df[header] for df in frames]
             heuristics = {
                 # OBS I now added the abs before max which wasn't there before
@@ -181,11 +183,11 @@ class FileFilter(FileProcessor):
             }
 
             for (h_name, h_values), threshold in zip(heuristics.items(), thresholds):
-                z_filter = ZScoreFilter(threshold)
+                z_mask = ZScoreMask(threshold)
                 n_before = len(frames)
-                # Filter all remaining frames based on the computed heuristic
-                frames = [f for f, support in zip(frames, h_values) if not z_filter(support)]
-                print(f'skipped {len(frames) - n_before} frames ({header} {h_name} outlier)')
+                # Filter all remaining frames based on the z scores over the computed heuristic
+                frames = [frame for frame, outlier in zip(frames, z_mask(h_values)) if not outlier]
+                print(f'skipped {abs(len(frames) - n_before)} frames ({header} {h_name} outlier)')
 
         return frames
 
@@ -206,7 +208,7 @@ class FocusScissor(Scissor):
         target = frame["target"]
         anchors = [0, *target[target.diff().fillna(0) != 0].index.tolist()]
         segments = []
-        for i in range(0, len(anchors) - 1, 2):
+        for i in tqdm(range(0, len(anchors) - 1, 2), desc='Segmenting files'):
             s = frame.iloc[anchors[i] + th:anchors[i + 1], :].copy()
             # Add the initial timestamp of the segment
             start_time = s["Time (ms)"].iloc[0]

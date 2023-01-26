@@ -1,19 +1,20 @@
 from collections import namedtuple
-from pathlib import Path
 
 from torch import tensor, int as torch_int, save
 from torch.utils.data import Dataset
+from yaml import load as load_yaml, FullLoader
 
-from processor import DataProcessor
-from utils.ki import LABELS as KI_LABELS, FILENAME_REGEX as KI_FILENAME_REGEX, AXIS as KI_AXIS, SACCADE as KI_SACCADE
+from processor import DataProcessor, Leif
+from utils.ki import LABELS as KI_LABELS, FILENAME_REGEX as KI_FILENAME_REGEX, AXIS as KI_AXIS, SACCADE as KI_SACCADE, \
+    load_data
+from utils.path import ki_data_tmp_path, config_path
 
 
 class KIDataset(Dataset):
     Signature = namedtuple('Signature', ['x', 'y', 'z', 'r', 'a', 's'])
 
-    def __init__(self, *, data_dir: Path, save_dir: Path, data_processor: DataProcessor, train: bool):
-        # Do KI specific stuff: train/test files --> dataframes, filenames
-        dataframes, filenames = ..., ...
+    def __init__(self, *, data_processor: DataProcessor, train: bool):
+        dataframes, filenames = load_data(train)
 
         segmented_files = data_processor(dataframes)
 
@@ -36,7 +37,7 @@ class KIDataset(Dataset):
         # Pickle data for faster future loading TODO not sure if Pathlib Path works here, maybe need to resolve it
         save_filename = f"ki-dataset-{'train' if train else 'test'}"
         save({'x': self.x, 'y': self.y, 'z': self.z, 'r': self.r, 'a': self.a, 's': self.s},
-             f'{save_dir}/{save_filename}')
+             f'{ki_data_tmp_path}/{save_filename}')
 
     def __getitem__(self, item):
         return self.Signature(self.x[item], self.y[item], self.z[item], self.r[item], self.a[item], self.s[item])
@@ -59,3 +60,14 @@ def populate_ki(segmented_files, filenames):
                 s=KI_SACCADE[saccade],
             ))
     return zip(*datapoints)
+
+
+if __name__ == '__main__':
+    train = True
+
+    with open(f'{config_path}/leif.yaml', 'r') as reader:
+        config = load_yaml(reader, Loader=FullLoader)
+
+    processor = Leif(train, config)
+
+    ds = KIDataset(data_processor=processor, train=train)

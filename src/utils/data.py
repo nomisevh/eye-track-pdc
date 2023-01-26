@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import zscore
 
 
-class ZScoreFilter:
+class ZScoreMask:
     def __init__(self, threshold):
         self.threshold = threshold
 
@@ -11,5 +11,16 @@ class ZScoreFilter:
 
 
 def z_score_outlier(data, std=3.0):
+    """
+    :param data: The data for which z-scores are computed
+    :param std: The threshold measured in number of std deviations away from the mean.
+    :return: A mask over the data. True where the z-score is greater than the threshold.
+    """
     z_scores = np.abs(zscore(data, axis=0))
     return z_scores > std
+
+
+def interpolate_outliers(df, columns):
+    for col in columns:
+        df[col] = df[col].mask(z_score_outlier(df[col])).interpolate()
+    return df
