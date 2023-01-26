@@ -35,4 +35,5 @@ foo(bar,
 ### Comments
 
 * Include docstring for classes, functions and methods whenever not self-documenting
+    * Use reStructuredText docstring format
 * Include comments whenever code block is not self-documenting
