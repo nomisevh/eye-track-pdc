@@ -38,6 +38,12 @@ class KIDataset(Dataset):
         save({'x': self.x, 'y': self.y, 'z': self.z, 'r': self.r, 'a': self.a, 's': self.s},
              f'{save_dir}/{save_filename}')
 
+    def __getitem__(self, item):
+        return self.Signature(self.x[item], self.y[item], self.z[item], self.r[item], self.a[item], self.s[item])
+
+    def __len__(self):
+        return len(self.y)
+
 
 def populate_ki(segmented_files, filenames):
     datapoints = []
