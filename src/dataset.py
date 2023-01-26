@@ -41,7 +41,7 @@ class KIDataset(Dataset):
 
 def populate_ki(segmented_files, filenames):
     datapoints = []
-    for (segments, filename), trial in enumerate(zip(segmented_files, filenames)):
+    for trial, (segments, filename) in enumerate(zip(segmented_files, filenames)):
         individual, group, axis, saccade = KI_FILENAME_REGEX.findall(filename)[0]
         for seg in segments:
             datapoints.append(KIDataset.Signature(

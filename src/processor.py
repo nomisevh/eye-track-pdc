@@ -166,7 +166,7 @@ class FileFilter(FileProcessor):
         """
         Filter the frames by max value, signal-to-noise ratio and mean velocity. The filter is applied with respect to
         the position and the drift independently.
-        
+
         :param frames: A list holding the dataframes to be filtered
         """
         for header, thresholds in zip(FileFilter.SERIES_HEADERS, [self.position_thresholds, self.drift_thresholds]):
