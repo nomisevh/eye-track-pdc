@@ -127,11 +127,11 @@ class SaccadeAmplitudeNormalizer(FileProcessor):
         skipped = 0
 
         for i in tqdm(range(len(frames)), desc='Normalizing files'):
-            target = frames[i]["target"]
+            target = frames[i-skipped]["target"]
             target_diff = target.diff().fillna(0)
             anchors = [*target[target_diff != 0].index.tolist()]
             if not len(anchors):
-                del frames[i]
+                del frames[i-skipped]
                 skipped += 1
                 continue
 
@@ -140,14 +140,14 @@ class SaccadeAmplitudeNormalizer(FileProcessor):
                 # Use only positive values, as negative and positive saccades have different magnitude in eye position.
                 if target_diff[anchors[j]] < 0:
                     continue
-                saccade = frames[i]["position"][anchors[j] - 1: anchors[j + 1]]
+                saccade = frames[i-skipped]["position"][anchors[j] - 1: anchors[j + 1]]
                 peak_value = np.median(saccade[-self.n:])
                 idle_value = np.median(saccade[:self.n])
                 saccade_diffs.append(abs(peak_value - idle_value))
             if not len(saccade_diffs):
                 raise Exception("no positive saccades found")
             # scale the reference value to get a nice range
-            frames[i][["position", "drift", "target"]] /= (np.median(saccade_diffs) * self.scaling_factor)
+            frames[i-skipped][["position", "drift", "target"]] /= (np.median(saccade_diffs) * self.scaling_factor)
 
         print(f"skipped {skipped} files (no target movement)")
         return frames
