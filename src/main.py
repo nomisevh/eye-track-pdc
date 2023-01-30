@@ -2,10 +2,12 @@ from argparse import ArgumentParser
 from enum import Enum
 
 from torch.cuda import is_available as cuda_is_available
+from yaml import load as load_yaml, FullLoader
 
 from src.dataset import KIDataset
 from src.entrypoint import handle_rocket, handle_inception_time, handle_inception_former
 from src.processor import Leif
+from src.utils.path import config_path
 
 
 class Model(Enum):
@@ -18,15 +20,15 @@ def main(args):
     use_train_data = args.data_partition == 'train'
     group_by_trail = args.model == Model.INCEPTION_FORMER
 
-    # TODO load config yaml for processor
-    processor_config = ...
     if args.processor_config == 'leif':
+        with open(f'{config_path}/leif.yaml', 'r') as reader:
+            processor_config = load_yaml(reader, Loader=FullLoader)
         preprocessor = Leif(train=use_train_data, config=processor_config)
     else:
         raise NotImplementedError
 
     if args.data_source == 'ki':
-        # Todo use group by trail
+        # Todo use group by trial
         ds = KIDataset(data_processor=preprocessor, train=use_train_data)
     else:
         raise NotImplementedError
