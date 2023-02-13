@@ -20,11 +20,11 @@ sanitation:
       position:
         max_value: 'auto'
         snr: 'auto'
-        mean_vel: 'auto'
+        mean_vel: 0.3
       drift:
         max_value: 'auto'
         snr: 'auto'
-        mean_vel: 'auto'
+        mean_vel: 0.3
   segment:
     thresholds:
       position:

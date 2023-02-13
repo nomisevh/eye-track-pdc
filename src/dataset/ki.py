@@ -10,7 +10,7 @@ from torch.utils.data import Dataset
 
 from dataset.ki_utils import load_ki_trials
 from utils.path import data_path
-from preprocess.base import Trial, CompositeProcessor
+from preprocess.preprocess import Trial, CompositeProcessor
 
 
 class KIDataset(Dataset):
@@ -37,6 +37,8 @@ class KIDataset(Dataset):
         ----------
         train         : bool
                         Set to true/false for the training/testing set.
+        which         : str
+                        One of "segments", "trials". This is the quantity that is yielded at every `__getitem__` call.
         config        : str
                         The config to use for the pre-processing pipeline.
         data_sources  : list of str
@@ -45,8 +47,6 @@ class KIDataset(Dataset):
                         (Optional) Path to store processed data. Default to data directory if not provided.
         verbose       : bool
                         Set to true to enable logging of the resulting data distributions.
-        which         : str
-                        One of "segments", "trials". This is the quantity that is yielded at every `__getitem__` call.
         """
         self.data_path = os.path.join(str(data_path), ki_data_dirname)
         self.save_path = os.path.join(str(save_dir if save_dir is not None else data_path), ki_data_dirname)
@@ -130,7 +130,8 @@ class KIDataset(Dataset):
         return len(self.x)
 
     def __getitem__(self, index: Any) -> Tuple[float, int, int, int, int, int]:
-        return self.x[index], self.y[index], self.z[index], self.r[index], self.a[index], self.s[index]
+        return KIDataset.Signature(self.x[index], self.y[index], self.z[index], self.r[index], self.a[index],
+                                   self.s[index])
 
     # def get_cloned(self, index: Any) -> Tuple[float, int, int, int, int, int]:
     #     return self.x.clone()[index], self.y.clone()[index], self.z.clone()[index], self.t.clone()[index], \
@@ -180,5 +181,6 @@ class KIDataset(Dataset):
 
 
 if __name__ == '__main__':
-    _ds = KIDataset(train=True, which='segments', ki_data_dirname='KI', data_sources=['HC', 'PD_OFF', 'PD_ON'])
-    # _ds[0]
+    _ds = KIDataset(train=True, which='trials', config='ki_auto', ki_data_dirname='KI',
+                    data_sources=['HC', 'PD_OFF', 'PD_ON'])
+    _ds[0]

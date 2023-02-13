@@ -12,8 +12,7 @@ import torch
 import yaml
 from tqdm import tqdm
 
-from preprocess.ifaces import MTSData, Operation, AtomicOperation, Capturable, Scissor, ParallelMapReduce, \
-    BatchOperation
+from preprocess.ifaces import MTSData, Operation, AtomicOperation, Capturable, Scissor, BatchOperation
 from utils.path import config_path
 
 
@@ -268,7 +267,7 @@ class NormalizeSaccadeAmplitude(AtomicOperation, Capturable):
 
 
 class ZScoreFilter(BatchOperation, Capturable):
-    def __init__(self, heuristic: Callable, threshold: float, col_name: str):
+    def __init__(self, heuristic: Callable, threshold: float or str, col_name: str):
         self.heuristic = heuristic
         self.threshold = threshold
         self.col_name = col_name
@@ -329,7 +328,7 @@ class RemoveNoisyData(BatchOperation, Capturable, metaclass=abc.ABCMeta):
     This class is used to remove noisy data. Those can either be trial files or single segments.
     """
 
-    def __init__(self, heuristics: Dict[str, Callable], col_thresholds: Dict[str, Dict[str, float]]):
+    def __init__(self, heuristics: Dict[str, Callable], col_thresholds: Dict[str, Dict[str, float or str]]):
         self.filters: Dict[str, Dict[str, ZScoreFilter]] = {
             col: {
                 hk: ZScoreFilter(h, thresholds[hk], col_name=col)
@@ -499,7 +498,7 @@ class SequentialProcessor(AtomicOperation, Capturable):
             op.load_state_dict(sd['ops'][op_i])
 
 
-class ParallelFileProcessor(ParallelMapReduce, Capturable):
+class ParallelFileProcessor(BatchOperation, Capturable):
     """
     ParallelFileProcessor Class:
     Parallel executor for sequential operations on trial files. The files
@@ -535,8 +534,8 @@ class CompositeProcessor(SequentialProcessor):
             ParallelFileProcessor(
                 map_ops=[
                     RenameChannels(),
-                    SelectChannels(channels=config['channels']),
                     ComputeVelocity(**config['compute_velocity']),
+                    SelectChannels(channels=config['channels']),  # todo: update config accordingly
                     NormalizeSaccadeAmplitude(**config['normalization']['saccade_amplitude']),
                 ]
             ),
@@ -571,33 +570,33 @@ class CompositeProcessor(SequentialProcessor):
         self.verbose = verbose
 
     def __call__(self, trials: List[Trial]) -> List[Trial]:
-        self.n_files, self.n_segments = [len(trials)], [sum(len(t.segments) for t in trials if not t.removed)]
+        # self.n_files, self.n_segments = [len(trials)], [sum(len(t.segments) for t in trials if not t.removed)]
         pbar = tqdm(self.ops)
         for op in pbar:
             pbar.set_description(op.__class__.__name__)
             trials = op([t for t in trials if not t.removed])
-            self.n_files.append(len([t for t in trials if not t.removed]))
-            self.n_segments.append(
-                sum(len(t.usable_segments) for t in trials if not t.removed)
-            )
-        if self.verbose:
-            import matplotlib.pyplot as plt
-            fig, ax = plt.subplots()
-            ax.plot(self.n_files, '-or', label='files')
-            ax.set_ylabel('# files', color='red')
-            ax2 = ax.twinx()
-            self.n_segments[:3] = [self.n_segments[3]] * 3
-            ax2.plot(self.n_segments, '-ob', label='segments')
-            ax2.set_ylabel('# segments', color='blue')
-            plt.title('How many data are removed?')
-            plt.tight_layout()
-            if not os.path.exists('pp_numbers.pdf'):
-                plt.savefig('pp_numbers.pdf')
-            else:
-                plt.savefig('pp_numbers_second_time.pdf')
-            plt.show()
-            print(self.n_segments)
-            print(self.n_files)
+            # self.n_files.append(len([t for t in trials if not t.removed]))
+            # self.n_segments.append(
+            #     sum(len(t.usable_segments) for t in trials if not t.removed)
+            # )
+        # if self.verbose:
+        #     import matplotlib.pyplot as plt
+        #     fig, ax = plt.subplots()
+        #     ax.plot(self.n_files, '-or', label='files')
+        #     ax.set_ylabel('# files', color='red')
+        #     ax2 = ax.twinx()
+        #     self.n_segments[:3] = [self.n_segments[3]] * 3
+        #     ax2.plot(self.n_segments, '-ob', label='segments')
+        #     ax2.set_ylabel('# segments', color='blue')
+        #     plt.title('How many data are removed?')
+        #     plt.tight_layout()
+        #     if not os.path.exists('pp_numbers.pdf'):
+        #         plt.savefig('pp_numbers.pdf')
+        #     else:
+        #         plt.savefig('pp_numbers_second_time.pdf')
+        #     plt.show()
+        #     print(self.n_segments)
+        #     print(self.n_files)
         return [t for t in trials if not t.removed]
 
     @staticmethod

@@ -8,7 +8,7 @@ from typing import Callable, Dict, List, Pattern, Tuple
 from pandas import DataFrame
 
 from data.KI.gothrough_clean import extract
-from preprocess.base import Trial
+from preprocess.preprocess import Trial
 
 KI_LABELS: Dict[str, int] = {'HC': 0, 'PDOFF': 1, 'PDON': 2}
 KI_AXIS: Dict[str, int] = {'horiz': 0, 'vert': 1}

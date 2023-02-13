@@ -114,38 +114,6 @@ class BatchOperation(Operation):
         raise NotImplementedError
 
 
-class ParallelMapReduce(BatchOperation, metaclass=abc.ABCMeta):
-    """
-    Generic placeholder for operations acting on a batch of MTS in parallel.
-
-    Methods
-    -------
-    __call__(batch=[pd.DataFrame(), pd.DataFrame()])
-        Invoke the batch operation(s) for the input list of dataframe objects.
-    """
-    ...
-
-
-# --------------------------------------------------------
-
-
-class TrialProcessor(AtomicOperation):
-    """
-    TrialProcessor Class:
-    This class processes each trial file independently
-    """
-
-    @abc.abstractmethod
-    def __call__(self, trial_mts: MTSData, **kwargs) -> List[DataFrame]:
-        """
-        Processes a list of multivariate time series (MTS)
-        :param frames: A list containing dataframes which hold the MTS
-        :param kwargs: Any processor-specific arguments
-        :return: A list holding the processed MTS
-        """
-        raise NotImplementedError
-
-
 # --------------------------------------------------------
 
 class Scissor(AtomicOperation, Capturable):
@@ -159,19 +127,3 @@ class Scissor(AtomicOperation, Capturable):
         :return: A list holding the segmented MTS
         """
         raise NotImplementedError
-
-
-class SegmentProcessor(ABC):
-
-    @abc.abstractmethod
-    def __call__(self, frames: DataFrame, **kwargs) -> DataFrame:
-        """
-        Processes a segment of a multivariate time series (MTS)
-        :param frames: A dataframes holding the MTS segment
-        :param kwargs: Any processor-specific arguments
-        :return: The processed MTS segment
-        """
-        raise NotImplementedError
-
-
-
