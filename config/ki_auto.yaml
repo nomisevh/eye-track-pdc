@@ -2,12 +2,23 @@ channels:
   - time
   - position
   - drift
+  - position_diff
+  - drift_diff
   - target
+  - position_velocity
+  - drift_velocity
+  - position_diff_velocity
+  - drift_diff_velocity
+final_channels:
+  - position
+  - drift
+  - position_diff
+  - drift_diff
 compute_velocity:
   include_magnitude: false
 normalization:
   saccade_amplitude:
-    scaling_factor: 0.1
+    scaling_factor: 0.5
     lookup_samples: 10
     col_names:
       - position
@@ -16,22 +27,20 @@ sanitation:
   trial:
     thresholds:
       position:
-        max_value: 3.0
-        snr: 3.0
+        max_value: 'auto'
+        snr: 'auto'
         mean_vel: 0.3
       drift:
-        max_value: 3.0
-        snr: 3.0
+        max_value: 'auto'
+        snr: 'auto'
         mean_vel: 0.3
   segment:
     thresholds:
       position:
-        max_value: 3.0
+        max_value: 'auto:1.94'
       drift:
-        max_value: 3.0
+        max_value: 'auto'
 segmentation:
   sample_rate: 300 # Hz
   post_saccade_time_threshold: 1 # sec
   exclude_first: true
-trim_segments:
-  per_trial: true
