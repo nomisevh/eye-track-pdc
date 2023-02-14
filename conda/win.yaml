@@ -13,3 +13,5 @@ dependencies:
   - pytorch
   - cudatoolkit
   - prettytable
+  - einops
+  - jupyter
