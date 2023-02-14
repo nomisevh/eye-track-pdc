@@ -11,11 +11,18 @@ from pandas import DataFrame
 
 @dataclasses.dataclass
 class MTSData(metaclass=abc.ABCMeta):
-    x: pd.DataFrame
+    x: pd.DataFrame = dataclasses.field(default_factory=lambda: pd.DataFrame())
     removed: bool = False
+    _column_names: List = dataclasses.field(default_factory=lambda: [])
 
     def only_cols_(self, col_names: List[str]):
         self.x = self.x[col_names]
+
+    @property
+    def columns(self) -> List[str]:
+        if len(self._column_names) > 0:
+            return self._column_names
+        return list(self.x.columns)
 
     @property
     @abc.abstractmethod

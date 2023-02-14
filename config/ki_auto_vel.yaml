@@ -14,6 +14,10 @@ final_channels:
   - drift
   - position_diff
   - drift_diff
+  - position_velocity
+  - drift_velocity
+  - position_diff_velocity
+  - drift_diff_velocity
 compute_velocity:
   include_magnitude: false
 normalization:

@@ -60,7 +60,7 @@ class Trial(MTSData):
     segments: List[TrialSegment] = dataclasses.field(default_factory=lambda: [])
 
     def __init__(self, mts: pd.DataFrame, label: int, person_id: int, **metadata):
-        self.x = mts
+        super().__init__(x=mts)
         self.y = int(label)
         self.z = int(person_id)
         self.meta = metadata
@@ -73,6 +73,11 @@ class Trial(MTSData):
     @property
     def usable_segments(self):
         return [s for s in self.segments if not s.removed]
+
+    def only_cols_(self, col_names: List[str]):
+        super().only_cols_(col_names)
+        for segment in self.segments:
+            segment.only_cols_(col_names)
 
     def to_torch_(self) -> None:
         self.x = torch.from_numpy(self.x.values).float()
@@ -88,6 +93,7 @@ class Trial(MTSData):
             segment.trim_(new_len)
 
     def state_dict(self) -> Dict[str, torch.Tensor or dict]:
+        columns = list(self.columns)
         if type(self.x) != torch.Tensor:
             self.to_torch_()
         return {
@@ -97,6 +103,7 @@ class Trial(MTSData):
             'meta': self.meta,
             'segments': [s.state_dict() for s in self.segments],
             'removed': self.removed,
+            'columns': columns,
         }
 
     def load_state_dict(self, sd: Dict[str, torch.Tensor or dict]) -> None:
@@ -105,6 +112,7 @@ class Trial(MTSData):
         self.z = sd['z']
         self.meta = sd['meta']
         self.removed = sd['removed']
+        self._column_names = sd['columns']
         self.segments = []
         for sd_s in sd['segments']:
             s = TrialSegment(x=pd.DataFrame([]))
@@ -560,9 +568,14 @@ class CompositeProcessor(SequentialProcessor):
             ),
             ParallelFileProcessor(
                 map_ops=[
-                    TrimTrialSegments(per_trial=True)
+                    TrimTrialSegments(per_trial=True),
                 ]
-            ) if trim_per_trial else TrimTrialSegments(per_trial=False)
+            ) if trim_per_trial else TrimTrialSegments(per_trial=False),
+            ParallelFileProcessor(
+                map_ops=[
+                    SelectChannels(channels=config['final_channels']),
+                ]
+            )
         ]
         super().__init__(ops=ops)
         self.n_files = None

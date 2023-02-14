@@ -29,6 +29,7 @@ class KIDataset(Dataset):
                  config: str = 'ki_auto',
                  data_sources: List[str] = ('HC',),
                  save_dir: Optional[Path or str] = None,
+                 regenerate: bool = False,
                  verbose: bool = True):
         """
         KIDataset class constructor.
@@ -52,12 +53,14 @@ class KIDataset(Dataset):
         self.save_path = os.path.join(str(save_dir if save_dir is not None else data_path), ki_data_dirname)
         self.config = config
         self.which = which
-        self.preprocessor = CompositeProcessor.from_config(config, trim_per_trial=which == 'trials')
+        self.train = train
+        # self.preprocessor = CompositeProcessor.from_config(config, trim_per_trial=which == 'trials')
+        self.preprocessor = CompositeProcessor.from_config(config, trim_per_trial=False)
 
         # Generate preprocessor checkpoint
-        pp_sd_filename = self.get_sd_filename(data_sources=data_sources) + '.pth'
+        pp_sd_filename = self.get_sd_filename(data_sources=data_sources) + f'__which_{which}' + '.pth'
         pp_sd_filepath = os.path.join(self.save_path, pp_sd_filename)
-        if not os.path.exists(pp_sd_filepath):
+        if not os.path.exists(pp_sd_filepath) or (regenerate and train):
             # Stats file is not found: Need to generate this from training data
             print(f'\t[{self.__class__.__name__}][__init__] Generating preprocessing state dict...')
             #   - load all training trial files found in the source folder(s)
@@ -69,11 +72,12 @@ class KIDataset(Dataset):
             self.preprocessor(trials)
             torch.save(self.preprocessor.state_dict(), pp_sd_filepath)
             print(f'\t[{self.__class__.__name__}][__init__] State dict saved at: {pp_sd_filepath}')
+            regenerate = True
 
         # Generate (processed) data checkpoint
-        ckpt_filename = self.get_ckpt_filename(data_sources=data_sources) + '.pth'
+        ckpt_filename = self.get_ckpt_filename(data_sources=data_sources) + f'__which_{which}' + '.pth'
         ckpt_filepath = os.path.join(self.data_path, 'train' if train else 'test', ckpt_filename)
-        if not os.path.exists(ckpt_filepath):
+        if not os.path.exists(ckpt_filepath) or regenerate:
             print(f'\t[{self.__class__.__name__}][__init__] Generating data checkpoint...')
             # Load all trial files found in the source folder(s)
             trials = list(chain(*[
@@ -87,6 +91,7 @@ class KIDataset(Dataset):
             processed_trials = self.preprocessor(trials)
             # Save processed trials
             torch.save([t.state_dict() for t in processed_trials], ckpt_filepath)
+            print(f'\t[{self.__class__.__name__}][__init__] Data checkpoint saved at: {ckpt_filepath}')
 
         # Load dataset
         trials = []
@@ -96,6 +101,7 @@ class KIDataset(Dataset):
             if not t.removed:
                 trials.append(t)
         self.x, self.y, self.z, self.r, self.a, self.s = self.load_from_trials(trials)
+        self.columns = trials[0].columns
 
         if verbose:
             self.log_data_distribution()
@@ -181,6 +187,8 @@ class KIDataset(Dataset):
 
 
 if __name__ == '__main__':
-    _ds = KIDataset(train=True, which='trials', config='ki_auto', ki_data_dirname='KI',
-                    data_sources=['HC', 'PD_OFF', 'PD_ON'])
-    _ds[0]
+    _which = 'trials'
+    _ds = KIDataset(train=True, which=_which, config='ki_auto', ki_data_dirname='KI',
+                    data_sources=['HC'], regenerate=False)
+    print(_ds.columns)
+    print(_ds[0].x.x.shape if _which == 'trials' else _ds[0].x.shape)
