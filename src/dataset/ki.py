@@ -2,15 +2,15 @@ import os
 from collections import namedtuple
 from itertools import chain
 from pathlib import Path
-from typing import Optional, List, Any, Tuple
+from typing import Optional, List, Any
 
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
 from dataset.ki_utils import load_ki_trials
-from utils.path import data_path
 from preprocess.preprocess import Trial, CompositeProcessor
+from utils.path import data_path
 
 
 class KIDataset(Dataset):
@@ -135,7 +135,7 @@ class KIDataset(Dataset):
     def __len__(self):
         return len(self.x)
 
-    def __getitem__(self, index: Any) -> Tuple[float, int, int, int, int, int]:
+    def __getitem__(self, index: Any) -> Signature:
         return KIDataset.Signature(self.x[index], self.y[index], self.z[index], self.r[index], self.a[index],
                                    self.s[index])
 
