@@ -142,6 +142,7 @@ class SelectChannels(AtomicOperation, Capturable):
         self.col_names = sd['col_names']
 
 
+# TODO this is incorrect in several ways, should not be used for now.
 class RenameChannels(AtomicOperation, Capturable):
     # Case-insensitive mapping of {old_name1: new_name1, ..., old_nameM: new_nameM}
     NAME_MAP = {
@@ -541,7 +542,7 @@ class CompositeProcessor(SequentialProcessor):
         ops = [
             ParallelFileProcessor(
                 map_ops=[
-                    RenameChannels(),
+                    # RenameChannels(),
                     ComputeVelocity(**config['compute_velocity']),
                     SelectChannels(channels=config['channels']),  # todo: update config accordingly
                     NormalizeSaccadeAmplitude(**config['normalization']['saccade_amplitude']),

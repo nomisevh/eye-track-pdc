@@ -8,8 +8,8 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from dataset.ki_utils import load_ki_trials
 from preprocess.preprocess import Trial, CompositeProcessor
+from utils.ki import load_data
 from utils.path import data_path
 
 
@@ -65,7 +65,7 @@ class KIDataset(Dataset):
             print(f'\t[{self.__class__.__name__}][__init__] Generating preprocessing state dict...')
             #   - load all training trial files found in the source folder(s)
             trials = list(chain(*[
-                load_ki_trials(os.path.join(self.data_path, 'train', src))
+                load_data(train=train, source=src)
                 for src in data_sources
             ]))
             #   - preprocess trial files
@@ -81,7 +81,7 @@ class KIDataset(Dataset):
             print(f'\t[{self.__class__.__name__}][__init__] Generating data checkpoint...')
             # Load all trial files found in the source folder(s)
             trials = list(chain(*[
-                load_ki_trials(os.path.join(self.data_path, 'train' if train else 'test', src))
+                load_data(train=train, source=src)
                 for src in data_sources
             ]))
 
@@ -116,6 +116,8 @@ class KIDataset(Dataset):
         # Create segments dataset
         x, y, z, r, a, s = self.__class__.populate_ki(trials, which=self.which)
         if self.which == 'segments':
+            # TODO the dimensions of x should be permuted here. It is now (N, T, M) instead of (N, M, T). Check why this
+            #  is not done here and whether it has been accounted for in InceptionTime training.
             # Tensor with shape (N, M, T) holding the multivariate time series.
             # N is number of data points, M is the dimensionality and T is the length of the series.
             x = torch.nn.utils.rnn.pad_sequence(x, batch_first=True).float()

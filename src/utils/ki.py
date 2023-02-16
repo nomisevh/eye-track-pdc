@@ -12,8 +12,9 @@ from matplotlib import pyplot as plt
 from pandas import DataFrame
 from tqdm.auto import tqdm
 
+from preprocess.preprocess import Trial
 from src.utils.data import interpolate_outliers
-from src.utils.path import walk_of_life, ki_data_path
+from src.utils.path import walk_of_life, ki_data_path as data_path
 
 LABELS: Dict[str, int] = {'HC': 0, 'PDOFF': 1, 'PDON': 2}
 AXIS: Dict[str, int] = {'horiz': 0, 'vert': 1}
@@ -22,17 +23,39 @@ FILENAME_REGEX: RegexPattern = compile_regex(r'(\d+?)_(\w+?)_\w+?_(\w+?)_\d+?_(\
 SAMPLE_RATE = 300
 
 
-def load_data(train: bool):
-    data_path = ki_data_path.joinpath('train' if train else 'test').resolve().__str__()
+def load_data(train: bool, source: str):
+    """
+    :param train: Whether to load the training or test set
+    :param source: Which group of participants to load (HC, PD_OFF, PD_ON)
+    :return:
+    """
+    full_path = data_path.joinpath('train' if train else 'test').joinpath(source)
 
     def apply(root: str, filename: str):
         # Extract the time series from the raw file
         frame = extract(filename=filename, root=root, plot=False)
         # Rename the columns to consolidate trials on different axes
-        return rename_columns(frame, filename), filename
+        frame = rename_columns(frame, filename)
+
+        # Extract metadata from filename
+        individual, group, axis, saccade = FILENAME_REGEX.findall(filename)[0]
+
+        # Create Trial object
+        return Trial(mts=frame,
+                     label=LABELS[group],
+                     person_id=individual,
+                     # TODO what is the point of creating a dict and then spreading the items? Isn't that equivalent to
+                     #  just passing them as keyword arguments? Also, why is there label and group? //S
+                     **dict(
+                         group_str=group,
+                         axis_str=axis,
+                         saccade_str=saccade,
+                         group=LABELS[group],
+                         axis=AXIS[axis],
+                         saccade=SACCADE[saccade]))
 
     # Accumulate returns from walk of life
-    return zip(*list(tqdm(walk_of_life(data_path, apply, 'csv'), desc='Loading files')))
+    return list(tqdm(walk_of_life(full_path, apply, 'csv'), desc='Loading files'))
 
 
 def extract(filename: str, root: str, plot: bool = True, head_norm_n: int = 300) -> DataFrame:
@@ -135,13 +158,21 @@ def rename_columns(frame: DataFrame, filename: str):
     if filename.find('vert') != -1:
         # vertical saccades experiment
         frame.rename(
-            columns={'xpos': 'drift', 'xpos_diff': 'drift_diff', 'ypos': 'position', 'ypos_diff': 'position_diff'},
+            columns={'Time (ms)': 'time',
+                     'xpos': 'drift',
+                     'xpos_diff': 'drift_diff',
+                     'ypos': 'position',
+                     'ypos_diff': 'position_diff'},
             inplace=True
         )
     else:
         # horizontal saccades experiment
         frame.rename(
-            columns={'ypos': 'drift', 'ypos_diff': 'drift_diff', 'xpos': 'position', 'xpos_diff': 'position_diff'},
+            columns={'Time (ms)': 'time',
+                     'ypos': 'drift',
+                     'ypos_diff': 'drift_diff',
+                     'xpos': 'position',
+                     'xpos_diff': 'position_diff'},
             inplace=True
         )
     return frame
