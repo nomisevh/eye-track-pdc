@@ -27,7 +27,7 @@ class KIDataset(Dataset):
                  which: str = 'trials',
                  ki_data_dirname: str = 'ki',
                  config: str = 'ki_auto',
-                 data_sources: List[str] = ('HC',),
+                 data_sources: List[str] = ['HC', 'PD_ON', 'PD_OFF'],
                  save_dir: Optional[Path or str] = None,
                  regenerate: bool = False,
                  verbose: bool = True):
@@ -116,10 +116,9 @@ class KIDataset(Dataset):
         # Create segments dataset
         x, y, z, r, a, s = self.__class__.populate_ki(trials, which=self.which)
         if self.which == 'segments':
-            # TODO the dimensions of x should be permuted here. It is now (N, T, M) instead of (N, M, T). Check why this
-            #  is not done here and whether it has been accounted for in InceptionTime training.
-            # Tensor with shape (N, M, T) holding the multivariate time series.
+            # Tensor with shape (N, T, M) holding the multivariate time series.
             # N is number of data points, M is the dimensionality and T is the length of the series.
+            # Padding along time-dimension
             x = torch.nn.utils.rnn.pad_sequence(x, batch_first=True).float()
         # Tensor with shape (N) holding the labels
         y = torch.tensor(y).float()
