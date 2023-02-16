@@ -57,21 +57,3 @@ class ROCKET(nn.Module):
         if self.normalize:
             return normalize_tensor(out)
         return out
-
-
-# Cell
-def create_rocket_features(dl, model, verbose=False):
-    """Args:
-        model     : ROCKET model instance
-        dl        : single TSDataLoader (for example dls.train or dls.valid)
-        verbose   : show progress bar
-    """
-    _x_out = []
-    _y_out = []
-    for i, (xb, yb) in enumerate(tqdm(dl, disable=not verbose, leave=False, desc='batch/batches')):
-        _x_out.append(model(xb).cpu())
-        _y_out.append(yb.cpu())
-    return torch.cat(_x_out).numpy(), torch.cat(_y_out).numpy()
-
-
-get_rocket_features = create_rocket_features

@@ -1,6 +1,6 @@
-from scipy.stats import zscore
 import numpy as np
 import torch
+from scipy.stats import zscore
 
 
 class PadCollate:
@@ -74,3 +74,15 @@ def interpolate_outliers(df, columns):
     for col in columns:
         df[col] = df[col].mask(z_score_outlier(df[col])).interpolate(limit_direction='both')
     return df
+
+
+def normalize(x):
+    m = x.mean(0, keepdim=True)
+    s = x.std(0, unbiased=False, keepdim=True)
+    x -= m
+    x /= s
+    return x
+
+
+def binarize(dataset):
+    dataset.y[dataset.y != 0] = 1
