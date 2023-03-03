@@ -32,7 +32,7 @@ def load_data(train: bool):
         return rename_columns(frame, filename), filename
 
     # Accumulate returns from walk of life
-    return zip(*list(tqdm(walk_of_life(data_path, apply, 'csv'), desc='Loading files')))
+    return zip(*list(tqdm(walk_of_life(data_path, apply, 'csv'), desc='loading files', unit='files')))
 
 
 def extract(filename: str, root: str, plot: bool = True, head_norm_n: int = 300) -> DataFrame:

@@ -4,9 +4,9 @@ from enum import Enum
 from torch.cuda import is_available as cuda_is_available
 from yaml import load as load_yaml, FullLoader
 
+from processor.processor import Leif
 from src.dataset import KIDataset
 from src.entrypoint import handle_rocket, handle_inception_time, handle_inception_former
-from src.processor import Leif
 from src.utils.path import config_path
 
 

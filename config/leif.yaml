@@ -12,3 +12,8 @@ file_normalization:
 segmentation:
   post_saccade_time_threshold: 1
   exclude_first: true
+channels:
+  - position
+  - drift
+  - position_velocity
+  - drift_velocity

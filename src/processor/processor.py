@@ -1,77 +1,20 @@
 """
 This file hosts our data preprocessing pipeline including sanitation, normalization, segmentation.
 """
-import abc
-from abc import ABC
 from typing import List
 
 import numpy as np
 from numpy import finfo
 from pandas import DataFrame
+from torch import inf
 from tqdm import tqdm
 
+from processor.interface import MainProcessor, BatchProcessor, Scissor
 from utils.data import ZScoreMask
 from utils.ki import SAMPLE_RATE
 
 
-class DataProcessor(ABC):
-
-    @abc.abstractmethod
-    def __call__(self, frames: List[DataFrame], **kwargs) -> List[List[DataFrame]]:
-        """
-        Processes and segments a multivariate time series (MTS)
-
-        :param frames: A list containing dataframes which hold the MTS
-        :param kwargs: Any processor-specific arguments
-        :return: A list holding all the processed and segmented MTS
-        """
-        raise NotImplementedError
-
-
-# TODO File / Trial / something else?
-class FileProcessor(ABC):
-
-    @abc.abstractmethod
-    def __call__(self, frames: List[DataFrame], **kwargs) -> List[DataFrame]:
-        """
-        Processes a list of multivariate time series (MTS)
-
-        :param frames: A list containing dataframes which hold the MTS
-        :param kwargs: Any processor-specific arguments
-        :return: A list holding the processed MTS
-        """
-        raise NotImplementedError
-
-
-class Scissor(ABC):
-
-    @abc.abstractmethod
-    def __call__(self, frame: DataFrame, **kwargs) -> List[DataFrame]:
-        """
-        Segments a multivariate time series (MTS)
-
-        :param frame: A dataframe holding the MTS
-        :param kwargs: Any processor-specific arguments
-        :return: A list holding the segmented MTS
-        """
-        raise NotImplementedError
-
-
-class SegmentProcessor(ABC):
-
-    @abc.abstractmethod
-    def __call__(self, frames: DataFrame, **kwargs) -> DataFrame:
-        """
-        Processes a segment of a multivariate time series (MTS)
-
-        :param frames: A dataframes holding the MTS segment
-        :param kwargs: Any processor-specific arguments
-        :return: The processed MTS segment
-        """
-        raise NotImplementedError
-
-
-class Leif(DataProcessor):
+class Leif(MainProcessor):
     """
     Our main data preprocessor.
     """
@@ -81,8 +24,9 @@ class Leif(DataProcessor):
         self.sanitizer = FileFilter(**config['sanitation'])
         self.file_normalizer = SaccadeAmplitudeNormalizer(**config['file_normalization'])
         self.scissor = FocusScissor(sample_rate=SAMPLE_RATE, **config['segmentation'])
+        self.channels = config['channels']
 
-    def __call__(self, frames: List[DataFrame], **kwargs) -> List[DataFrame]:
+    def __call__(self, frames: List[DataFrame], **kwargs) -> List[List[DataFrame]]:
         # TODO should we sanitize at all if test?
         # Sanitize files
         if self.train:
@@ -91,25 +35,36 @@ class Leif(DataProcessor):
         # Normalize files
         frames = self.file_normalizer(frames)
 
-        # For each file:
-        # Segment
-        for frame in frames:
+        # For each file/trial:
+        trials, min_segment_length = [], inf
+        for frame in tqdm(frames, desc='segmenting time series', unit='ts'):
+            # Segment
             segmented_frame = self.scissor(frame)
 
             # For every segment:
-            # Normalize segment
-            # compute velocity
-            # Record segment length TODO this might be able to simplify, e.g. by doing it when (if) we sanitize segments
+            for i, segment in enumerate(segmented_frame):
+                # Normalize segment
+                segment = normalize(segment, second_moment=False)
+                # Compute velocity for every segment
+                segment = compute_velocity(segment)
+                # Select channels
+                segmented_frame[i] = segment[self.channels]
+
+            # update minimum segment length
+            min_segment_length = min(min_segment_length, min(map(lambda s: s.shape[0], segmented_frame)))
             # Append to segment list for file
-            # end for
-        # end for
+            trials.append(segmented_frame)
 
         # Sanitize segments w.r.t all files
         # Trim segments
-        ...
+        for i, trial in enumerate(trials):
+            for j, segment in enumerate(trial):
+                trials[i][j] = segment[-min_segment_length:]
+
+        return trials
 
 
-class SaccadeAmplitudeNormalizer(FileProcessor):
+class SaccadeAmplitudeNormalizer(BatchProcessor):
     """
     Normalizes files individually based on the approximate median amplitude of all positive saccades.
     """
@@ -126,12 +81,12 @@ class SaccadeAmplitudeNormalizer(FileProcessor):
     def __call__(self, frames: List[DataFrame], **kwargs) -> List[DataFrame]:
         skipped = 0
 
-        for i in tqdm(range(len(frames)), desc='Normalizing files'):
-            target = frames[i-skipped]["target"]
+        for i in range(len(frames)):
+            target = frames[i - skipped]["target"]
             target_diff = target.diff().fillna(0)
             anchors = [*target[target_diff != 0].index.tolist()]
             if not len(anchors):
-                del frames[i-skipped]
+                del frames[i - skipped]
                 skipped += 1
                 continue
 
@@ -140,20 +95,20 @@ class SaccadeAmplitudeNormalizer(FileProcessor):
                 # Use only positive values, as negative and positive saccades have different magnitude in eye position.
                 if target_diff[anchors[j]] < 0:
                     continue
-                saccade = frames[i-skipped]["position"][anchors[j] - 1: anchors[j + 1]]
+                saccade = frames[i - skipped]["position"][anchors[j] - 1: anchors[j + 1]]
                 peak_value = np.median(saccade[-self.n:])
                 idle_value = np.median(saccade[:self.n])
                 saccade_diffs.append(abs(peak_value - idle_value))
             if not len(saccade_diffs):
                 raise Exception("no positive saccades found")
             # scale the reference value to get a nice range
-            frames[i-skipped][["position", "drift", "target"]] /= (np.median(saccade_diffs) * self.scaling_factor)
+            frames[i - skipped][["position", "drift", "target"]] /= (np.median(saccade_diffs) * self.scaling_factor)
 
         print(f"skipped {skipped} files (no target movement)")
         return frames
 
 
-class FileFilter(FileProcessor):
+class FileFilter(BatchProcessor):
     """
     Filters files based on z scores on a number of heuristics.
     """
@@ -187,7 +142,7 @@ class FileFilter(FileProcessor):
                 n_before = len(frames)
                 # Filter all remaining frames based on the z scores over the computed heuristic
                 frames = [frame for frame, outlier in zip(frames, z_mask(h_values)) if not outlier]
-                print(f'skipped {abs(len(frames) - n_before)} frames ({header} {h_name} outlier)')
+                print(f'skipped {abs(len(frames) - n_before)} files ({header} {h_name} outlier)')
 
         return frames
 
@@ -208,7 +163,11 @@ class FocusScissor(Scissor):
         target = frame["target"]
         anchors = [0, *target[target.diff().fillna(0) != 0].index.tolist()]
         segments = []
-        for i in tqdm(range(0, len(anchors) - 1, 2), desc='Segmenting files'):
+        min_seg_length = inf
+        for i in range(0, len(anchors) - 1, 2):
+            if i == 0 and self.exclude_first:
+                continue
+
             s = frame.iloc[anchors[i] + th:anchors[i + 1], :].copy()
             # Add the initial timestamp of the segment
             start_time = s["Time (ms)"].iloc[0]
@@ -217,4 +176,39 @@ class FocusScissor(Scissor):
             # Place the segment in the returning list
             segments.append(s)
 
-        return segments[(1 if self.exclude_first else 0):]
+        return segments
+
+
+def compute_velocity(df: DataFrame) -> DataFrame:
+    """
+    Computes the first-order differences of the position and drift w.r.t. time.
+    Returns the same DataFrame with the velocity fields added.
+    """
+    d_time = df["Time (ms)"].diff().replace(0, np.nan).fillna(1)
+
+    d_pos = df["position"].diff().fillna(0)
+    d_drift = df["drift"].diff().fillna(0)
+
+    d_pos_diff = df["position_diff"].diff().fillna(0)
+    d_drift_diff = df["drift_diff"].diff().fillna(0)
+
+    df["position_velocity"] = d_pos / d_time
+    df["drift_velocity"] = d_drift / d_time
+
+    df["position_diff_velocity"] = d_pos_diff / d_time
+    df["drift_diff_velocity"] = d_drift_diff / d_time
+
+    df['velocity_magnitude'] = np.linalg.norm(df[["position_velocity", "drift_velocity"]], axis=1)
+    df['velocity_diff_magnitude'] = np.linalg.norm(df[["position_diff_velocity", "drift_diff_velocity"]],
+                                                   axis=1)
+
+    # Skip first data point as we lack info about velocity for it
+    return df[1:]
+
+
+def normalize(df: DataFrame, second_moment: bool) -> DataFrame:
+    df_cols = df[["position", "drift", "position_diff", "drift_diff"]]
+    df[["position", "drift", "position_diff", "drift_diff"]] -= df_cols.mean(axis=0)
+    if second_moment:
+        df[["position", "drift", "position_diff", "drift_diff"]] /= df_cols.std(axis=0)
+    return df
