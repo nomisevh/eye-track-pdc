@@ -19,17 +19,15 @@ class Leif(MainProcessor):
     Our main data preprocessor.
     """
 
-    def __init__(self, train: bool, config: dict):
-        self.train = train
+    def __init__(self, config: dict):
         self.sanitizer = FileFilter(**config['sanitation'])
         self.file_normalizer = SaccadeAmplitudeNormalizer(**config['file_normalization'])
         self.scissor = FocusScissor(sample_rate=SAMPLE_RATE, **config['segmentation'])
         self.channels = config['channels']
 
-    def __call__(self, frames: List[DataFrame], **kwargs) -> List[List[DataFrame]]:
-        # TODO should we sanitize at all if test?
+    def __call__(self, frames: List[DataFrame], train=True) -> List[List[DataFrame]]:
         # Sanitize files
-        if self.train:
+        if train:
             frames = self.sanitizer(frames)
 
         # Normalize files
@@ -56,6 +54,7 @@ class Leif(MainProcessor):
             trials.append(segmented_frame)
 
         # Sanitize segments w.r.t all files
+        # TODO the min segment length might have to be synced between train and test
         # Trim segments
         for i, trial in enumerate(trials):
             for j, segment in enumerate(trial):
@@ -102,9 +101,11 @@ class SaccadeAmplitudeNormalizer(BatchProcessor):
             if not len(saccade_diffs):
                 raise Exception("no positive saccades found")
             # scale the reference value to get a nice range
+            # TODO normalize diffs
             frames[i - skipped][["position", "drift", "target"]] /= (np.median(saccade_diffs) * self.scaling_factor)
 
-        print(f"skipped {skipped} files (no target movement)")
+        if skipped > 0:
+            print(f"skipped {skipped} files (no target movement)")
         return frames
 
 
@@ -129,11 +130,8 @@ class FileFilter(BatchProcessor):
         for header, thresholds in iterator:
             series = [df[header] for df in frames]
             heuristics = {
-                # OBS I now added the abs before max which wasn't there before
                 'max value': [s.abs().max() for s in series],
                 'snr': [s.abs().max() / (s.var() + finfo(float).eps) for s in series],
-                # TODO (low prio) we could compute the velocity before this point and use that. That way we would
-                #  avoid computing diff here AND later when adding the velocity channel.
                 'mean velocity': [s.diff().fillna(0).abs().mean(axis=0) for s in series]
             }
 
@@ -206,6 +204,7 @@ def compute_velocity(df: DataFrame) -> DataFrame:
     return df[1:]
 
 
+# TODO maybe diffs shouldn't centered, as their magnitude and sign might be important
 def normalize(df: DataFrame, second_moment: bool) -> DataFrame:
     df_cols = df[["position", "drift", "position_diff", "drift_diff"]]
     df[["position", "drift", "position_diff", "drift_diff"]] -= df_cols.mean(axis=0)

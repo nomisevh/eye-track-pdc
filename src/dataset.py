@@ -28,7 +28,7 @@ class KIDataset(Dataset):
 
         dataframes, filenames = load_data(train)
 
-        segmented_files = data_processor(dataframes)
+        segmented_files = data_processor(dataframes, train=train)
 
         x, y, z, r, a, s = populate_ki(segmented_files, filenames)
 
@@ -78,14 +78,12 @@ def populate_ki(segmented_files, filenames):
 
 
 def test():
-    train = True
-
     with open(f'{config_path}/leif.yaml', 'r') as reader:
         config = load_yaml(reader, Loader=FullLoader)
 
-    processor = Leif(train, config)
+    processor = Leif(config)
 
-    ds = KIDataset(data_processor=processor, train=train)
+    ds = KIDataset(data_processor=processor, train=True)
 
 
 if __name__ == '__main__':

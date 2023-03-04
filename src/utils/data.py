@@ -22,5 +22,17 @@ def z_score_outlier(data, std=3.0):
 
 def interpolate_outliers(df, columns):
     for col in columns:
-        df[col] = df[col].mask(z_score_outlier(df[col])).interpolate()
+        df[col] = df[col].mask(z_score_outlier(df[col])).interpolate(limit_direction='both')
     return df
+
+
+def binarize(dataset):
+    dataset.y[dataset.y != 0] = 1
+
+
+def normalize(x):
+    m = x.mean(0, keepdim=True)
+    s = x.std(0, unbiased=False, keepdim=True)
+    x -= m
+    x /= s
+    return x
