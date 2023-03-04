@@ -3,7 +3,8 @@ from os import makedirs
 from os.path import exists, isfile
 
 from numpy import array
-from torch import tensor, int as torch_int, save, load
+from sklearn.model_selection import train_test_split
+from torch import tensor, int as torch_int, save, load, isin, logical_not
 from torch.utils.data import Dataset
 from yaml import load as load_yaml, FullLoader
 
@@ -11,6 +12,7 @@ from processor.interface import MainProcessor
 from processor.processor import Leif
 from utils.ki import LABELS as KI_LABELS, FILENAME_REGEX as KI_FILENAME_REGEX, AXIS as KI_AXIS, SACCADE as KI_SACCADE, \
     load_data
+from utils.misc import torch_unique_index
 from utils.path import ki_data_tmp_path, config_path
 
 
@@ -60,6 +62,11 @@ class KIDataset(Dataset):
             makedirs(save_path.parent)
         save({'x': self.x, 'y': self.y, 'z': self.z, 'r': self.r, 'a': self.a, 's': self.s}, save_path)
 
+    def clone(self, index):
+        clone = KIDataset.__new__(KIDataset)
+        clone.__dict__.update({attr: value.clone()[index] for attr, value in self.__dict__.items()})
+        return clone
+
 
 def populate_ki(segmented_files, filenames):
     datapoints = []
@@ -75,6 +82,25 @@ def populate_ki(segmented_files, filenames):
                 s=KI_SACCADE[saccade],
             ))
     return zip(*datapoints)
+
+
+def train_test_split_stratified(dataset: KIDataset, test_size: float = 0.1, seed=42):
+    """
+    Split KIDataset instance's data into training and test set satisfying two conditions:
+        - mutually exclusive sets of patients
+        - (approximately) equal class distributions in each subset
+    :param KIDataset dataset: dataset instance
+    :param float test_size: test set size percentage (defaults to 0.1 or 10%)
+    :param int seed: SRNG seed (defaults to 42)
+    :return: a tuple object with two new KIDataset instances
+    """
+    # Sample Patient Numbers
+    zs, zsi = torch_unique_index(dataset.z)
+    ys = dataset.y[zsi]
+    z_train, z_test, y_train, y_test = train_test_split(zs, ys, test_size=test_size, stratify=ys, random_state=seed)
+    # Create Subsets
+    train_indices = isin(dataset.z, z_train)
+    return dataset.clone(train_indices), dataset.clone(logical_not(train_indices))
 
 
 def test():
