@@ -95,9 +95,10 @@ class SaccadeAmplitudeNormalizer(BatchProcessor):
                 # Use only positive values, as negative and positive saccades have different magnitude in eye position.
                 if target_diff[anchors[j]] < 0:
                     continue
-                saccade = df["position"][anchors[j] - 1: anchors[j + 1]]
-                peak_value = np.median(saccade[-self.n:])
-                idle_value = np.median(saccade[:self.n])
+
+                saccade_start, saccade_end = anchors[j] - 1, anchors[j + 1]
+                peak_value = np.median(df["position"][saccade_end - self.n:saccade_end])
+                idle_value = np.median(df["position"][saccade_start - self.n:saccade_start])
                 saccade_diffs.append(abs(peak_value - idle_value))
             if not len(saccade_diffs):
                 raise Exception("no positive saccades found")
