@@ -67,6 +67,7 @@ class SaccadeAmplitudeNormalizer(BatchProcessor):
     """
     Normalizes files individually based on the approximate median amplitude of all positive saccades.
     """
+    NORMALIZE_CHANNELS = ["position", "drift", "target"]
 
     def __init__(self, *, trailing_window_width, scaling_factor=0.1):
         """
@@ -80,12 +81,12 @@ class SaccadeAmplitudeNormalizer(BatchProcessor):
     def __call__(self, frames: List[DataFrame], **kwargs) -> List[DataFrame]:
         skipped = 0
 
-        for i in range(len(frames)):
-            target = frames[i - skipped]["target"]
+        normalized_frames = []
+        for df in frames:
+            target = df["target"]
             target_diff = target.diff().fillna(0)
             anchors = [*target[target_diff != 0].index.tolist()]
             if not len(anchors):
-                del frames[i - skipped]
                 skipped += 1
                 continue
 
@@ -94,19 +95,22 @@ class SaccadeAmplitudeNormalizer(BatchProcessor):
                 # Use only positive values, as negative and positive saccades have different magnitude in eye position.
                 if target_diff[anchors[j]] < 0:
                     continue
-                saccade = frames[i - skipped]["position"][anchors[j] - 1: anchors[j + 1]]
+                saccade = df["position"][anchors[j] - 1: anchors[j + 1]]
                 peak_value = np.median(saccade[-self.n:])
                 idle_value = np.median(saccade[:self.n])
                 saccade_diffs.append(abs(peak_value - idle_value))
             if not len(saccade_diffs):
                 raise Exception("no positive saccades found")
+
             # scale the reference value to get a nice range
             # TODO normalize diffs
-            frames[i - skipped][["position", "drift", "target"]] /= (np.median(saccade_diffs) * self.scaling_factor)
+            df[self.NORMALIZE_CHANNELS] /= (np.median(saccade_diffs) * self.scaling_factor)
+
+            normalized_frames.append(df)
 
         if skipped > 0:
             print(f"skipped {skipped} files (no target movement)")
-        return frames
+        return normalized_frames
 
 
 class FileFilter(BatchProcessor):
