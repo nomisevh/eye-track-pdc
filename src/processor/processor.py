@@ -67,7 +67,7 @@ class SaccadeAmplitudeNormalizer(BatchProcessor):
     """
     Normalizes files individually based on the approximate median amplitude of all positive saccades.
     """
-    NORMALIZE_CHANNELS = ["position", "drift", "target"]
+    NORMALIZE_CHANNELS = ["position", "drift", "target", "position_diff", "drift_diff"]
 
     def __init__(self, *, trailing_window_width, scaling_factor=0.1):
         """

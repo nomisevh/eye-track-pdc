@@ -17,3 +17,5 @@ channels:
   - drift
   - position_velocity
   - drift_velocity
+  - position_diff
+  - drift_diff
