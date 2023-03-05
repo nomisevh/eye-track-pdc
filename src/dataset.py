@@ -15,6 +15,7 @@ from utils.ki import LABELS as KI_LABELS, FILENAME_REGEX as KI_FILENAME_REGEX, A
     load_data
 from utils.misc import torch_unique_index
 from utils.path import ki_data_tmp_path, config_path
+from utils.visualize import plot_series_samples
 
 
 class KIDataset(Dataset):
@@ -142,6 +143,7 @@ def test():
     processor = Leif(config)
 
     ds = KIDataset(data_processor=processor, train=True)
+    plot_series_samples(ds.x[:, 0], labels=ds.y, n=10)
 
     for train_ds, test_ds in k_fold_cross_validator(ds, k=4):
         ...
