@@ -1,10 +1,11 @@
 from collections import namedtuple
 from os import makedirs
 from os.path import exists, isfile
+from typing import Tuple, Sequence
 
 from numpy import array
 from sklearn.model_selection import train_test_split
-from torch import tensor, int as torch_int, save, load, isin, logical_not
+from torch import tensor, int as torch_int, save, load, isin, logical_not, cat
 from torch.utils.data import Dataset
 from yaml import load as load_yaml, FullLoader
 
@@ -67,6 +68,13 @@ class KIDataset(Dataset):
         clone.__dict__.update({attr: value.clone()[index] for attr, value in self.__dict__.items()})
         return clone
 
+    @classmethod
+    def concat(cls, datasets: Sequence['KIDataset']):
+        joint_dataset = cls.__new__(cls)
+        for attr in datasets[0].__dict__.keys():
+            setattr(joint_dataset, attr, cat([getattr(dataset, attr) for dataset in datasets], dim=0))
+        return joint_dataset
+
 
 def populate_ki(segmented_files, filenames):
     datapoints = []
@@ -103,6 +111,30 @@ def train_test_split_stratified(dataset: KIDataset, test_size: float = 0.1, seed
     return dataset.clone(train_indices), dataset.clone(logical_not(train_indices))
 
 
+def k_fold_cross_validator(dataset: KIDataset, k: int) -> Tuple[KIDataset, KIDataset]:
+    # Generate folds first, to ensure they are non-overlapping
+    folds = []
+    remainder = dataset
+    for i in range(k):
+        test_fraction = (1 / (k - i))
+        # Last fold
+        if test_fraction == 1:
+            folds.append(remainder)
+            break
+
+        # Split into fold and remainder
+        remainder, fold = train_test_split_stratified(remainder, test_size=test_fraction)
+        folds.append(fold)
+
+    for i in range(len(folds)):
+        # Let fold be the train split
+        train_ds = folds[i]
+        # Let all other folds be the test split
+        test_ds = KIDataset.concat([fold for j, fold in enumerate(folds) if i != j])
+
+        yield train_ds, test_ds
+
+
 def test():
     with open(f'{config_path}/leif.yaml', 'r') as reader:
         config = load_yaml(reader, Loader=FullLoader)
@@ -110,6 +142,9 @@ def test():
     processor = Leif(config)
 
     ds = KIDataset(data_processor=processor, train=True)
+
+    for train_ds, test_ds in k_fold_cross_validator(ds, k=4):
+        ...
 
 
 if __name__ == '__main__':
