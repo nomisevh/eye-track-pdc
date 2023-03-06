@@ -21,8 +21,11 @@ from utils.visualize import plot_series_samples
 class KIDataset(Dataset):
     Signature = namedtuple('Signature', ['x', 'y', 'z', 'r', 'a', 's'])
 
-    def __init__(self, *, data_processor: MainProcessor, train: bool):
-        file_path = ki_data_tmp_path.joinpath(f"ki-dataset-{'train' if train else 'test'}")
+    def __init__(self, *, data_processor: MainProcessor, train: bool, bundle_as_trials=False, use_triplets=False):
+        self.use_triplets = use_triplets
+
+        file_path = ki_data_tmp_path.joinpath(
+            f"ki-dataset-{'trial' if bundle_as_trials else 'seg'}-{'train' if train else 'test'}")
 
         # Use cached version of dataset if available
         if isfile(file_path):
@@ -34,11 +37,18 @@ class KIDataset(Dataset):
 
         segmented_files = data_processor(dataframes, train=train)
 
-        x, y, z, r, a, s = populate_ki(segmented_files, filenames)
+        if bundle_as_trials:
+            x, y, z, r, a, s = populate_ki_trials(segmented_files, filenames)
+            # Tensor with shape (N, L, M, T) holding the multivariate time series.
+            # N is number of data points, L is the number of segments in each trial, M is the dimensionality and
+            # T is the length of the series.
+            self.x = tensor(array(x)).float().permute(0, 1, 3, 2)
+        else:
+            x, y, z, r, a, s = populate_ki_segments(segmented_files, filenames)
+            # Tensor with shape (N, M, T) holding the multivariate time series.
+            # N is number of data points, M is the dimensionality and T is the length of the series.
+            self.x = tensor(array(x)).float().permute(0, 2, 1)
 
-        # Tensor with shape (N, M, T) holding the multivariate time series.
-        # N is number of data points, M is the dimensionality and T is the length of the series.
-        self.x = tensor(array(x)).float().permute(0, 2, 1)
         # Tensor with shape (N) holding the labels
         self.y = tensor(y).float()
         # Tensor with shape (N) holding which patient the data points belong to
@@ -54,7 +64,9 @@ class KIDataset(Dataset):
         self.save(file_path)
 
     def __getitem__(self, item):
-        return self.Signature(self.x[item], self.y[item], self.z[item], self.r[item], self.a[item], self.s[item])
+        anchor = self.Signature(self.x[item], self.y[item], self.z[item], self.r[item], self.a[item], self.s[item])
+        if not self.use_triplets:
+            return anchor
 
     def __len__(self):
         return len(self.y)
@@ -77,7 +89,7 @@ class KIDataset(Dataset):
         return joint_dataset
 
 
-def populate_ki(segmented_files, filenames):
+def populate_ki_segments(segmented_files, filenames):
     datapoints = []
     for trial, (segments, filename) in enumerate(zip(segmented_files, filenames)):
         individual, group, axis, saccade = KI_FILENAME_REGEX.findall(filename)[0]
@@ -90,6 +102,21 @@ def populate_ki(segmented_files, filenames):
                 a=KI_AXIS[axis],
                 s=KI_SACCADE[saccade],
             ))
+    return zip(*datapoints)
+
+
+def populate_ki_trials(segmented_files, filenames):
+    datapoints = []
+    for trial, (segments, filename) in enumerate(zip(segmented_files, filenames)):
+        individual, group, axis, saccade = KI_FILENAME_REGEX.findall(filename)[0]
+        datapoints.append(KIDataset.Signature(
+            x=[s.values for s in segments],
+            y=KI_LABELS[group],
+            z=int(individual),
+            r=trial,
+            a=KI_AXIS[axis],
+            s=KI_SACCADE[saccade],
+        ))
     return zip(*datapoints)
 
 
@@ -142,7 +169,7 @@ def test():
 
     processor = Leif(config)
 
-    ds = KIDataset(data_processor=processor, train=True)
+    ds = KIDataset(data_processor=processor, train=True, bundle_as_trials=True)
     plot_series_samples(ds.x[:, 0], labels=ds.y, n=10)
 
     for train_ds, test_ds in k_fold_cross_validator(ds, k=4):
