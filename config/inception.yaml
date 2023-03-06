@@ -1,0 +1,9 @@
+num_blocks: 3
+in_channels: 6
+out_channels: 64
+bottleneck_channels: 0
+kernel_sizes: 65
+use_residuals: default
+num_pred_classes: 32
+lr: 0.001
+wd: 0.01

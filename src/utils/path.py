@@ -9,8 +9,9 @@ root_path = Path(__file__).parent.parent.parent
 data_path = root_path.joinpath('data')
 ki_data_path = data_path.joinpath('ki')
 config_path = root_path.joinpath('config')
+log_path = root_path.joinpath('log')
+checkpoint_path = root_path.joinpath('checkpoint')
 src_path = root_path.joinpath('src')
-checkpoints_path = root_path.joinpath('checkpoints')
 ki_data_tmp_path = ki_data_path.joinpath('tmp')
 
 

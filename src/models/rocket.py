@@ -40,7 +40,7 @@ class ROCKET(nn.Module):
         self.convs = convs
         self.n_kernels = n_kernels
         self.kss = kss
-        self.to(device=device)
+        # self.to(device=device)
         self.verbose = verbose
         self.normalize = normalize
         self.out_dim = 2 * n_kernels
