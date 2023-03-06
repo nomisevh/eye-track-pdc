@@ -1,3 +1,4 @@
+import random
 from collections import namedtuple
 from os import makedirs
 from os.path import exists, isfile
@@ -5,17 +6,17 @@ from typing import Tuple, Sequence
 
 from numpy import array
 from sklearn.model_selection import train_test_split
-from torch import tensor, int as torch_int, save, load, isin, logical_not, cat
+from torch import tensor, int as torch_int, save, load, isin, logical_not, cat, argwhere, logical_and, Tensor
 from torch.utils.data import Dataset
 from yaml import load as load_yaml, FullLoader
 
 from processor.interface import MainProcessor
 from processor.processor import Leif
+from utils.data import binarize
 from utils.ki import LABELS as KI_LABELS, FILENAME_REGEX as KI_FILENAME_REGEX, AXIS as KI_AXIS, SACCADE as KI_SACCADE, \
     load_data
 from utils.misc import torch_unique_index
 from utils.path import ki_data_tmp_path, config_path
-from utils.visualize import plot_series_samples
 
 
 class KIDataset(Dataset):
@@ -34,6 +35,8 @@ class KIDataset(Dataset):
             return
 
         dataframes, filenames = load_data(train)
+
+        # dataframes, filenames = dataframes[:50], filenames[:50]
 
         segmented_files = data_processor(dataframes, train=train)
 
@@ -68,6 +71,21 @@ class KIDataset(Dataset):
         if not self.use_triplets:
             return anchor
 
+        # Compute the indices of all items that have the same label but are from a different individual than the anchor
+        positive_indices = argwhere(logical_and(self.y == anchor.y, self.z != anchor.z))  # noqa
+        # Compute the indices of all items that do not belong to the same patient as the anchor
+        negative_indices = argwhere(self.y != anchor.y)  # noqa
+
+        positive_item = random.choice(positive_indices).item()
+        negative_item = random.choice(negative_indices).item()
+
+        positive = self.Signature(self.x[positive_item], self.y[positive_item], self.z[positive_item],
+                                  self.r[positive_item], self.a[positive_item], self.s[positive_item])
+        negative = self.Signature(self.x[negative_item], self.y[negative_item], self.z[negative_item],
+                                  self.r[negative_item], self.a[negative_item], self.s[negative_item])
+
+        return anchor, positive, negative
+
     def __len__(self):
         return len(self.y)
 
@@ -78,13 +96,21 @@ class KIDataset(Dataset):
 
     def clone(self, index):
         clone = KIDataset.__new__(KIDataset)
-        clone.__dict__.update({attr: value.clone()[index] for attr, value in self.__dict__.items()})
+        for attr, value in self.__dict__.items():
+            # Only index attribute if it's a tensor
+            if isinstance(value, Tensor):
+                value = value.clone()[index]
+            # Otherwise, just take the same value (e.g. bool=True) OBS this will break with referenced values
+            setattr(clone, attr, value)
         return clone
 
     @classmethod
     def concat(cls, datasets: Sequence['KIDataset']):
         joint_dataset = cls.__new__(cls)
         for attr in datasets[0].__dict__.keys():
+            # Disregard attributes that are not tensors
+            if not isinstance(getattr(datasets[0], attr), Tensor):
+                continue
             setattr(joint_dataset, attr, cat([getattr(dataset, attr) for dataset in datasets], dim=0))
         return joint_dataset
 
@@ -169,11 +195,16 @@ def test():
 
     processor = Leif(config)
 
-    ds = KIDataset(data_processor=processor, train=True, bundle_as_trials=True)
-    plot_series_samples(ds.x[:, 0], labels=ds.y, n=10)
+    ds = KIDataset(data_processor=processor, train=True, bundle_as_trials=True, use_triplets=True)
+    # plot_series_samples(ds.x[:, 0], labels=ds.y, n=10)
 
     for train_ds, test_ds in k_fold_cross_validator(ds, k=4):
         ...
+
+    binarize(ds)
+
+    example = ds[112]
+    print()
 
 
 if __name__ == '__main__':
