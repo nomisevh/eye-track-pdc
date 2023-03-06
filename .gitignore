@@ -135,3 +135,5 @@ data/*.pkl
 local/
 data/ki/*
 .csv
+checkpoint/
+log/
