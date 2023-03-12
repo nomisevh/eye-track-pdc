@@ -4,7 +4,7 @@ This filename holds KI specific utilities and constants
 import math
 import os
 from re import Pattern as RegexPattern, compile as compile_regex
-from typing import Dict
+from typing import Dict, Iterable
 
 import numpy as np
 import pandas as pd
@@ -22,7 +22,7 @@ FILENAME_REGEX: RegexPattern = compile_regex(r'(\d+?)_(\w+?)_\w+?_(\w+?)_\d+?_(\
 SAMPLE_RATE = 300
 
 
-def load_data(train: bool):
+def load_data(train: bool, sources: Iterable[str]):
     data_path = ki_data_path.joinpath('train' if train else 'test').resolve().__str__()
 
     def apply(root: str, filename: str):
@@ -32,7 +32,7 @@ def load_data(train: bool):
         return rename_columns(frame, filename), filename
 
     # Accumulate returns from walk of life
-    return zip(*list(tqdm(walk_of_life(data_path, apply, 'csv'), desc='loading files', unit='files')))
+    return zip(*list(tqdm(walk_of_life(data_path, apply, 'csv', sources), desc='loading files', unit='files')))
 
 
 def extract(filename: str, root: str, plot: bool = True, head_norm_n: int = 300) -> DataFrame:
