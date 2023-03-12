@@ -69,7 +69,7 @@ class SaccadeAmplitudeNormalizer(BatchProcessor):
     """
     NORMALIZE_CHANNELS = ["position", "drift", "target", "position_diff", "drift_diff"]
 
-    def __init__(self, *, trailing_window_width, scaling_factor=0.1):
+    def __init__(self, *, trailing_window_width, scaling_factor=10):
         """
         :param trailing_window_width: The width of the trailing window over which the median values are computed.
         :param scaling_factor: The factor by which we scale the saccade amplitude before normalizing.
@@ -103,9 +103,9 @@ class SaccadeAmplitudeNormalizer(BatchProcessor):
             if not len(saccade_diffs):
                 raise Exception("no positive saccades found")
 
-            # scale the reference value to get a nice range
-            # TODO normalize diffs
-            df[self.NORMALIZE_CHANNELS] /= (np.median(saccade_diffs) * self.scaling_factor)
+            df[self.NORMALIZE_CHANNELS] /= np.median(saccade_diffs)
+            # scale the values to get a nice range
+            df[self.NORMALIZE_CHANNELS] *= self.scaling_factor
 
             normalized_frames.append(df)
 
