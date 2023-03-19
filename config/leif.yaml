@@ -2,11 +2,11 @@ sanitation:
   position_thresholds:
     max_value: 3.0
     snr: 3.0
-    mean_vel: 0.3
+    mean_vel: 3.0
   drift_thresholds:
     max_value: 3.0
     snr: 3.0
-    mean_vel: 0.3
+    mean_vel: 3.0
 file_normalization:
   trailing_window_width: 150  # datapoints
   scaling_factor: 10
