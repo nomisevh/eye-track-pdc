@@ -67,7 +67,7 @@ class LitInceptionTimeModel(LightningModule):
                  bottleneck_channels: Union[List[int], int], kernel_sizes: Union[List[int], int],
                  use_residuals: Union[List[bool], bool, str] = 'default',
                  num_pred_classes: int = 1, lr: float = 1e-3, wd: float = 1e-2,
-                 num_semi_hard_negatives: int = None) -> None:
+                 num_semi_hard_negatives: int = None, anchor_swap: bool = True) -> None:
         """
         Attributes
         ----------
@@ -113,11 +113,13 @@ class LitInceptionTimeModel(LightningModule):
         # in_features=channels[-1]
         self.linear = nn.Linear(in_features=channels[-1], out_features=num_pred_classes)
         self.out_dim = num_pred_classes
+        self.bottleneck_channels = bottleneck_channels
 
-        self.loss_fn = TripletMarginLoss(margin=0.2, p=2, swap=True)
+        self.loss_fn = TripletMarginLoss(margin=0.2, p=2, swap=anchor_swap)
         self.lr = lr
         self.wd = wd
         self.num_semi_hard_negatives = num_semi_hard_negatives
+        self.anchor_swap = anchor_swap
         self.init()
         self.save_hyperparameters()
 
