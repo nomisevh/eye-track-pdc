@@ -1,5 +1,6 @@
 import numpy as np
-from scipy.stats import zscore
+from numpy import median, logical_or
+from scipy.stats import zscore, median_absolute_deviation
 
 
 class ZScoreMask:
@@ -7,7 +8,13 @@ class ZScoreMask:
         self.threshold = threshold
 
     def __call__(self, data):
-        return z_score_outlier(data, self.threshold)
+        return med_mad_outlier(data, self.threshold)
+
+
+def med_mad_outlier(data, deviations=3.0):
+    med = median(data)
+    mad = median_absolute_deviation(data)
+    return logical_or(data > med + deviations * mad, data < med - deviations * mad)
 
 
 def z_score_outlier(data, std=3.0):
