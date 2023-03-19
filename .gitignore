@@ -129,11 +129,15 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-data/*.pth
-!data/ki_dataset_pp_pdon_binary.pth
-data/*.pkl
+#data/*
+!data/ki/tmp/
+!data/ki/tmp/.gitkeep
+
 local/
-data/ki/*
-.csv
+*.csv
+*.DS_STORE
+*.pth
+*.pkl
+*.docx
 checkpoint/
 log/
