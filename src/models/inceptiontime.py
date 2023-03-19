@@ -3,8 +3,9 @@ from typing import Union, List, cast
 import torch
 from prettytable import PrettyTable
 from pytorch_lightning import LightningModule
-from torch import nn
+from torch import nn, argsort, norm
 from torch.nn import TripletMarginLoss
+from torch.nn.functional import normalize
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
@@ -65,7 +66,8 @@ class LitInceptionTimeModel(LightningModule):
     def __init__(self, num_blocks: int, in_channels: int, out_channels: Union[List[int], int],
                  bottleneck_channels: Union[List[int], int], kernel_sizes: Union[List[int], int],
                  use_residuals: Union[List[bool], bool, str] = 'default',
-                 num_pred_classes: int = 1, lr: float = 1e-3, wd: float = 1e-2) -> None:
+                 num_pred_classes: int = 1, lr: float = 1e-3, wd: float = 1e-2,
+                 num_semi_hard_negatives: int = None) -> None:
         """
         Attributes
         ----------
@@ -112,9 +114,11 @@ class LitInceptionTimeModel(LightningModule):
         self.linear = nn.Linear(in_features=channels[-1], out_features=num_pred_classes)
         self.out_dim = num_pred_classes
 
-        self.loss_fn = TripletMarginLoss(margin=1.0, p=2, swap=True)
+        self.loss_fn = TripletMarginLoss(margin=0.2, p=2, swap=True)
         self.lr = lr
         self.wd = wd
+        self.num_semi_hard_negatives = num_semi_hard_negatives
+        self.init()
         self.save_hyperparameters()
 
     def count_params(self, verbose: bool = False) -> int:
@@ -144,7 +148,8 @@ class LitInceptionTimeModel(LightningModule):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
         x = self.blocks(x).mean(dim=-1)  # the mean is the global average pooling
-        return self.linear(x)
+        # L2 Normalize output dimension to enforce outputs in unit hypersphere
+        return normalize(self.linear(x))
 
     def init(self) -> 'LitInceptionTimeModel':
         def initialize_weights(m):
@@ -168,6 +173,19 @@ class LitInceptionTimeModel(LightningModule):
         anchor_out = self(anchor.x)
         positive_out = self(positive.x)
         negative_out = self(negative.x)
+
+        if step == 'train' and self.num_semi_hard_negatives is not None:
+            positive_dist = norm(anchor_out - positive_out, dim=-1)
+            negative_dist = norm(anchor_out - negative_out, dim=-1)
+            # Select the semi-hard negatives, i.e. the hardest negatives that are still further from the anchor than the
+            # positive. This is done in favour of naively choosing the hardest negatives, to avoid local minima.
+            negatives_order = argsort(negative_dist)
+            semi_hard_indices = negatives_order[negative_dist[negatives_order] > positive_dist[negatives_order]]
+
+            # Use the num_semi_hard_negatives hardest semi-hard triplets.
+            anchor_out = anchor_out[semi_hard_indices[:self.num_semi_hard_negatives]]
+            positive_out = positive_out[semi_hard_indices[:self.num_semi_hard_negatives]]
+            negative_out = negative_out[semi_hard_indices[:self.num_semi_hard_negatives]]
 
         loss = self.loss_fn(anchor_out, positive_out, negative_out)
         self.log(f'{step}_loss', loss, on_epoch=True, prog_bar=True)
