@@ -132,7 +132,7 @@ class KIDataset(Dataset):
 
     @staticmethod
     def format_filename(train, bundle_as_trials, sources):
-        return f"ki-[{','.join(sources)}]-{'trial' if bundle_as_trials else 'seg'}-{'train' if train else 'test'}.pth"
+        return f"ki-{','.join(sources)}-{'trial' if bundle_as_trials else 'seg'}-{'train' if train else 'test'}.pth"
 
 
 def populate_ki_segments(segmented_files, filenames):
