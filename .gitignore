@@ -141,3 +141,5 @@ local/
 *.docx
 checkpoint/
 log/
+config/neptune.yaml
+src/.neptune
