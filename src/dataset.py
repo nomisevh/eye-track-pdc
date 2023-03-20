@@ -2,13 +2,12 @@ import random
 from collections import namedtuple
 from os import makedirs
 from os.path import exists, isfile
-from typing import Tuple, Sequence
 
 import numpy as np
 from matplotlib import pyplot as plt
 from numpy import array
 from sklearn.model_selection import train_test_split
-from torch import tensor, int as torch_int, bool as torch_bool, save, load, isin, logical_not, cat, argwhere, \
+from torch import tensor, int as torch_int, bool as torch_bool, save, load, isin, logical_not, argwhere, \
     logical_and, Tensor, zeros, logical_or
 from torch.utils.data import Dataset
 from yaml import load as load_yaml, FullLoader
@@ -120,16 +119,6 @@ class KIDataset(Dataset):
             if isinstance(value, Tensor):
                 setattr(self, attr, value[~exclude_items])
 
-    @classmethod
-    def concat(cls, datasets: Sequence['KIDataset']):
-        joint_dataset = cls.__new__(cls)
-        for attr in datasets[0].__dict__.keys():
-            # Disregard attributes that are not tensors
-            if not isinstance(getattr(datasets[0], attr), Tensor):
-                continue
-            setattr(joint_dataset, attr, cat([getattr(dataset, attr) for dataset in datasets], dim=0))
-        return joint_dataset
-
     @staticmethod
     def format_filename(train, bundle_as_trials, sources):
         return f"ki-{','.join(sources)}-{'trial' if bundle_as_trials else 'seg'}-{'train' if train else 'test'}.pth"
@@ -185,30 +174,6 @@ def train_test_split_stratified(dataset: KIDataset, test_size: float = 0.1, seed
     return dataset.clone(train_indices), dataset.clone(logical_not(train_indices))
 
 
-def k_fold_cross_validator(dataset: KIDataset, k: int) -> Tuple[KIDataset, KIDataset]:
-    # Generate folds first, to ensure they are non-overlapping
-    folds = []
-    remainder = dataset
-    for i in range(k):
-        test_fraction = (1 / (k - i))
-        # Last fold
-        if test_fraction == 1:
-            folds.append(remainder)
-            break
-
-        # Split into fold and remainder
-        remainder, fold = train_test_split_stratified(remainder, test_size=test_fraction)
-        folds.append(fold)
-
-    for i in range(len(folds)):
-        # Let fold be the train split
-        train_ds = folds[i]
-        # Let all other folds be the test split
-        test_ds = KIDataset.concat([fold for j, fold in enumerate(folds) if i != j])
-
-        yield train_ds, test_ds
-
-
 def test():
     with open(f'{config_path}/leif.yaml', 'r') as reader:
         config = load_yaml(reader, Loader=FullLoader)
@@ -217,9 +182,6 @@ def test():
 
     ds = KIDataset(data_processor=processor, train=True, bundle_as_trials=False, use_triplets=False)
     # plot_series_samples(ds.x[:, 0], labels=ds.y, n=10)
-
-    for train_ds, test_ds in k_fold_cross_validator(ds, k=4):
-        ...
 
     binarize(ds)
 

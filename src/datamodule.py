@@ -23,7 +23,6 @@ class KIDataModule(LightningDataModule):
         super().__init__()
         self.train_ds = train_ds if train_ds is not None else None
         self.val_ds = val_ds if val_ds is not None else None
-        self.test_ds = None
         self.bundle_as_trials = bundle_as_trials
         self.use_triplets = use_triplets
         self.val_size = val_size
@@ -35,15 +34,15 @@ class KIDataModule(LightningDataModule):
     def setup(self, stage: str):
         # Assign train/val datasets for use in dataloaders
         if stage == "fit":
-            train_val_ds = KIDataset(data_processor=self.processor,
-                                     train=True,
-                                     bundle_as_trials=self.bundle_as_trials,
-                                     use_triplets=self.use_triplets)
-            self.train_ds, self.val_ds = train_test_split_stratified(train_val_ds, test_size=self.val_size)
+            self.train_val_ds = KIDataset(data_processor=self.processor,  # noqa
+                                          train=True,
+                                          bundle_as_trials=self.bundle_as_trials,
+                                          use_triplets=self.use_triplets)
+            self.train_ds, self.val_ds = train_test_split_stratified(self.train_val_ds, test_size=self.val_size)
 
         # Assign test dataset for use in dataloader
         if stage == "test":
-            self.test_ds = KIDataset(data_processor=self.processor,
+            self.test_ds = KIDataset(data_processor=self.processor,  # noqa
                                      train=False,
                                      bundle_as_trials=self.bundle_as_trials,
                                      use_triplets=False)
