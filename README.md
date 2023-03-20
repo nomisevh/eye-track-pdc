@@ -18,6 +18,14 @@ cd <project_root>
 conda env create -f conda/[os].yaml
 ```
 
+To update an existing environment to use the latest dependencies, run the following:
+
+```bash
+cd <project_root>
+conda activate eyetrackpdc
+conda env update --file conda/[OS].yaml --prune`
+```
+
 ### Datasets
 
 We use a private dataset from the Karolinska Institute for our experiments. For details, see our paper **todo**.
