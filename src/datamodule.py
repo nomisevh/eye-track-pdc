@@ -13,7 +13,7 @@ class KIDataModule(LightningDataModule):
         """
         :param train_ds: optional prepared train dataset
         :param val_ds: optional prepared validation dataset
-        :param processor_config: config for the data processor
+        :param processor_config: config for the data processor. If train_ds is not passed, this is a mandatory argument.
         :param bundle_as_trials: whether to bundle datapoints by trials
         :param use_triplets: whether to return triplets
         :param val_size: the relative size of the validation split
@@ -21,20 +21,27 @@ class KIDataModule(LightningDataModule):
         :param batch_size: the size of mini-batches, if -1 then equal to the length of the dataset
         """
         super().__init__()
-        self.train_ds = train_ds if train_ds is not None else None
-        self.val_ds = val_ds if val_ds is not None else None
+        self.train_ds, self.val_ds, self.test_ds, self.train_val_ds = None, None, None, None
+        if train_ds is not None:
+            self.train_ds = train_ds
+            self.train_ds.use_triplets = use_triplets
+        if val_ds is not None:
+            self.val_ds = val_ds
+            self.val_ds.use_triplets = use_triplets
+
         self.bundle_as_trials = bundle_as_trials
         self.use_triplets = use_triplets
         self.val_size = val_size
         self.binary_classification = binary_classification
         self.batch_size = batch_size
 
-        self.processor = Leif(processor_config)
+        if processor_config is not None:
+            self.processor = Leif(processor_config)
 
     def setup(self, stage: str):
         # Assign train/val datasets for use in dataloaders
-        if stage == "fit":
-            self.train_val_ds = KIDataset(data_processor=self.processor,  # noqa
+        if stage == "fit" and self.train_ds is None:
+            self.train_val_ds = KIDataset(data_processor=self.processor,
                                           train=True,
                                           bundle_as_trials=self.bundle_as_trials,
                                           use_triplets=self.use_triplets)
@@ -42,7 +49,7 @@ class KIDataModule(LightningDataModule):
 
         # Assign test dataset for use in dataloader
         if stage == "test":
-            self.test_ds = KIDataset(data_processor=self.processor,  # noqa
+            self.test_ds = KIDataset(data_processor=self.processor,
                                      train=False,
                                      bundle_as_trials=self.bundle_as_trials,
                                      use_triplets=False)
@@ -64,6 +71,6 @@ class KIDataModule(LightningDataModule):
     def test_dataloader(self):
         return DataLoader(self.test_ds, batch_size=len(self.test_ds) if self.batch_size == -1 else self.batch_size)
 
-    def set_use_triplets(self, val: bool):
-        self.train_ds.use_triplets = val
-        self.val_ds.use_triplets = val
+    def set_use_triplets(self, value: bool):
+        self.train_ds.use_triplets = value
+        self.val_ds.use_triplets = value

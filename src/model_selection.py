@@ -1,4 +1,6 @@
-from typing import Sequence, Tuple, Callable, Any
+import sys
+from abc import ABC, abstractmethod
+from typing import Sequence, Tuple, Any
 
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -12,10 +14,11 @@ def concat_datasets(datasets: Sequence[Dataset]):
     cls = datasets[0].__class__
     joint_dataset = cls.__new__(cls)
     for attr in datasets[0].__dict__.keys():
-        # Disregard attributes that are not tensors
-        if not isinstance(getattr(datasets[0], attr), Tensor):
-            continue
-        setattr(joint_dataset, attr, cat([getattr(dataset, attr) for dataset in datasets], dim=0))
+        if isinstance(getattr(datasets[0], attr), Tensor):
+            setattr(joint_dataset, attr, cat([getattr(dataset, attr) for dataset in datasets], dim=0))
+        else:
+            # For attributes that are not tensors, just use the value from the first dataset
+            setattr(joint_dataset, attr, getattr(datasets[0], attr))
     return joint_dataset
 
 
@@ -53,6 +56,11 @@ class Validator:
 
     SEEDS = np.arange(100)
 
+    class Callback(ABC):
+        @abstractmethod
+        def __call__(self, train_ds: Dataset, val_ds: Dataset, *args) -> Any:
+            raise NotImplementedError
+
     def __init__(self, num_random_inits=3, num_folds=5, splitter=None):
         """
         :param num_random_inits: The number of unique random seeds to run
@@ -64,7 +72,7 @@ class Validator:
         self.num_folds = num_folds
         self.splitter = splitter
 
-    def __call__(self, f: Callable[[Dataset, Dataset, ...], Any], dataset: Dataset, *bits):
+    def __call__(self, f: Callback, dataset: Dataset, *bits):
         """
         Will validate the function f for various random initializations and train/val splits. The number of runs is
         num_random_inits * num_folds.
@@ -84,13 +92,15 @@ class Validator:
         return np.average(metrics)
 
 
-def grid_search_2d(validator: Validator, callback: Callable[[Dataset, Dataset, ...], Any], dataset: Dataset,
+def grid_search_2d(validator: Validator, callback: Validator.Callback, dataset: Dataset,
                    param1_candidates: Sequence, param2_candidates: Sequence):
     scores = np.zeros((len(param1_candidates), len(param2_candidates)))
+    tot_configs = scores.size
     for i, param1 in enumerate(param1_candidates):
         for j, param2 in enumerate(param2_candidates):
+            print(f'searching config {j + i * len(param2_candidates) + 1} / {tot_configs}', file=sys.stderr)
             scores[i, j] = validator(callback, dataset, param1, param2)
 
-    np.savetxt('grid_search_result.csv', scores, delimiter=',')
+    np.savetxt('grid_search_result.csv', scores, delimiter=',')  # noqa
 
     return scores

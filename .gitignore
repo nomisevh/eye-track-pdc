@@ -142,4 +142,4 @@ local/
 checkpoint/
 log/
 config/neptune.yaml
-src/.neptune
+**/.neptune
