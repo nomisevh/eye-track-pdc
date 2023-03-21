@@ -58,7 +58,7 @@ class Validator:
 
     class Callback(ABC):
         @abstractmethod
-        def __call__(self, train_ds: Dataset, val_ds: Dataset, *args) -> Any:
+        def __call__(self, train_ds: Dataset, val_ds: Dataset, **kwargs) -> Any:
             raise NotImplementedError
 
     def __init__(self, num_random_inits=3, num_folds=5, splitter=None):
@@ -72,35 +72,41 @@ class Validator:
         self.num_folds = num_folds
         self.splitter = splitter
 
-    def __call__(self, f: Callback, dataset: Dataset, *bits):
+    def __call__(self, f: Callback, dataset: Dataset, **bits):
         """
         Will validate the function f for various random initializations and train/val splits. The number of runs is
         num_random_inits * num_folds.
 
         :param f: The function to be run.
         :param dataset: The dataset to be used in cross validation. This is usually the joint train/val set.
-        :param bits: Arguments to be drilled to f.
+        :param bits: Keyword arguments to be drilled to f.
         :return: The average of the metric returned by f, over all random initializations and all folds.
         """
         metrics = []
         for seed in self.SEEDS[:self.num_random_inits]:
             set_random_state(seed)
             for train_ds, val_ds in k_fold_cross_validator(dataset, k=self.num_folds, splitter=self.splitter):
-                out = f(train_ds, val_ds, *bits)
+                out = f(train_ds, val_ds, **bits)
                 metrics.append(out)
 
-        return np.average(metrics)
+        return np.average(metrics), np.std(metrics)
 
 
-def grid_search_2d(validator: Validator, callback: Validator.Callback, dataset: Dataset,
-                   param1_candidates: Sequence, param2_candidates: Sequence):
-    scores = np.zeros((len(param1_candidates), len(param2_candidates)))
+def grid_search_2d(validator: Validator, callback: Validator.Callback, dataset: Dataset, **kwargs):
+    (p1, p1_candidates), (p2, p2_candidates) = kwargs.items()
+
+    scores = np.zeros((len(p1_candidates), len(p2_candidates)))
+    deviations = np.zeros((len(p1_candidates), len(p2_candidates)))
     tot_configs = scores.size
-    for i, param1 in enumerate(param1_candidates):
-        for j, param2 in enumerate(param2_candidates):
-            print(f'searching config {j + i * len(param2_candidates) + 1} / {tot_configs}', file=sys.stderr)
-            scores[i, j] = validator(callback, dataset, param1, param2)
 
-    np.savetxt('grid_search_result.csv', scores, delimiter=',')  # noqa
+    for i, p1_val in enumerate(p1_candidates):
+        for j, p2_val in enumerate(p2_candidates):
+            print(f'searching config {j + i * len(p2_candidates) + 1} / {tot_configs} | {p1}={p1_val}, {p2}={p2_val}',
+                  file=sys.stderr)
+
+            scores[i, j], deviations[i, j] = validator(callback, dataset, **{p1: p1_val, p2: p2_val})
+
+    np.savetxt('grid_search_result_mean.csv', scores, delimiter=',')  # noqa
+    np.savetxt('grid_search_result_std.csv', deviations, delimiter=',')  # noqa
 
     return scores

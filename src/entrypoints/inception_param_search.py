@@ -1,3 +1,6 @@
+from warnings import filterwarnings
+
+from lightning_fabric.utilities.warnings import PossibleUserWarning
 from pytorch_lightning import Trainer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import f1_score
@@ -14,6 +17,7 @@ from utils.path import config_path, log_path
 
 
 def main():
+    filterwarnings("ignore", category=PossibleUserWarning)
     set_random_state(SEED)
 
     # Load configs
@@ -22,13 +26,9 @@ def main():
     with open(config_path.joinpath('inception.yaml')) as reader:
         inception_config = load_yaml(reader, Loader=FullLoader)
 
-    # Define callbacks
-
-    # Callback for searching number of bottleneck channels and hidden dimension
-    class BottleNeckAndHiddenDim(Validator.Callback):
-        def __call__(self, train_ds, val_ds, *args):
-            bottleneck_channels, hidden_dim = args
-
+    # Callback for searching the parameters of inceptionTime
+    class Callback(Validator.Callback):
+        def __call__(self, train_ds, val_ds, **kwargs):
             # Construct data module
             dm = KIDataModule(
                 train_ds=train_ds,
@@ -40,10 +40,7 @@ def main():
             dm.setup(stage='fit')
 
             # Overwrite InceptionTime config
-            inception_config['bottleneck_channels'] = bottleneck_channels
-            inception_config['out_channels'] = hidden_dim
-
-            inception_time = train_inception_time(dm, inception_config)
+            inception_time = train_inception_time(dm, inception_config={**inception_config, **kwargs})
 
             metric = fit_and_predict_clf(inception_time, dm)
 
@@ -56,9 +53,9 @@ def main():
     validator = Validator(num_random_inits=2, num_folds=5, splitter=train_test_split_stratified)
 
     # Perform grid search
-    _ = grid_search_2d(validator, BottleNeckAndHiddenDim(), train_val_ds,
-                       param1_candidates=[0, 1, 2, 4],
-                       param2_candidates=[32, 48, 64])
+    _ = grid_search_2d(validator, Callback(), train_val_ds,
+                       out_channels=[32, 48, 64],
+                       wd=[0.005, 0.01, 0.05])
 
 
 def train_inception_time(dm, inception_config):
@@ -66,9 +63,9 @@ def train_inception_time(dm, inception_config):
     trainer = Trainer(accelerator='auto',
                       max_epochs=100,
                       enable_checkpointing=False,
-                      default_root_dir=log_path)
+                      default_root_dir=log_path,
+                      log_every_n_steps=1)
     trainer.fit(inception_time, datamodule=dm)
-
     return inception_time
 
 
