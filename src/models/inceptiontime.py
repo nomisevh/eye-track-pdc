@@ -91,6 +91,7 @@ class LitInceptionTimeModel(LightningModule):
             The number of output classes
         """
         super().__init__()
+        self.bottleneck_channels = bottleneck_channels
 
         channels = [in_channels] + cast(List[int], self._expand_to_blocks(out_channels,
                                                                           num_blocks))
@@ -113,7 +114,6 @@ class LitInceptionTimeModel(LightningModule):
         # in_features=channels[-1]
         self.linear = nn.Linear(in_features=channels[-1], out_features=num_pred_classes)
         self.out_dim = num_pred_classes
-        self.bottleneck_channels = bottleneck_channels
 
         self.loss_fn = TripletMarginLoss(margin=0.2, p=2, swap=anchor_swap)
         self.lr = lr
