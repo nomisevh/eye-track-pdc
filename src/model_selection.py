@@ -58,7 +58,7 @@ class Validator:
 
     class Callback(ABC):
         @abstractmethod
-        def __call__(self, train_ds: Dataset, val_ds: Dataset, **kwargs) -> Any:
+        def __call__(self, train_ds: Dataset, val_ds: Dataset, iteration: int, **kwargs) -> Any:
             raise NotImplementedError
 
     def __init__(self, num_random_inits=3, num_folds=5, splitter=None):
@@ -83,11 +83,13 @@ class Validator:
         :return: The average of the metric returned by f, over all random initializations and all folds.
         """
         metrics = []
+        iteration = 0
         for seed in self.SEEDS[:self.num_random_inits]:
             set_random_state(seed)
             for train_ds, val_ds in k_fold_cross_validator(dataset, k=self.num_folds, splitter=self.splitter):
-                out = f(train_ds, val_ds, **bits)
+                out = f(train_ds, val_ds, iteration, **bits)
                 metrics.append(out)
+                iteration += 1
 
         return np.average(metrics), np.std(metrics)
 

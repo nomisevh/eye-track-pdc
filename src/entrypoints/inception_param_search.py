@@ -1,7 +1,9 @@
+from itertools import chain
 from warnings import filterwarnings
 
 from lightning_fabric.utilities.warnings import PossibleUserWarning
 from pytorch_lightning import Trainer
+from pytorch_lightning.callbacks import ModelCheckpoint
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import f1_score
 from yaml import FullLoader, load as load_yaml
@@ -13,7 +15,7 @@ from models.inceptiontime import LitInceptionTimeModel
 from processor.processor import Leif
 from utils.const import SEED
 from utils.misc import set_random_state
-from utils.path import config_path, log_path
+from utils.path import config_path, log_path, checkpoint_path
 
 
 def main():
@@ -28,7 +30,7 @@ def main():
 
     # Callback for searching the parameters of inceptionTime
     class Callback(Validator.Callback):
-        def __call__(self, train_ds, val_ds, **kwargs):
+        def __call__(self, train_ds, val_ds, iteration, **kwargs):
             # Construct data module
             dm = KIDataModule(
                 train_ds=train_ds,
@@ -39,10 +41,14 @@ def main():
             )
             dm.setup(stage='fit')
 
-            # Overwrite InceptionTime config
-            inception_time = train_inception_time(dm, inception_config={**inception_config, **kwargs})
+            checkpoint_filename = f'{"-".join(map(str, chain(*kwargs.items())))}-iter-{iteration}'
 
-            metric = fit_and_predict_clf(inception_time, dm)
+            # Overwrite InceptionTime config
+            train_inception_time(dm,
+                                 inception_config={**inception_config, **kwargs},
+                                 checkpoint_filename=checkpoint_filename)
+
+            metric = fit_and_predict_clf(dm, f'{checkpoint_filename}.ckpt')
 
             return metric
 
@@ -54,22 +60,27 @@ def main():
 
     # Perform grid search
     _ = grid_search_2d(validator, Callback(), train_val_ds,
-                       out_channels=[32, 48, 64],
-                       wd=[0.005, 0.01, 0.05])
+                       bottleneck_channels=[1, 2, 0],
+                       num_pred_classes=[64, 128, 256])
 
 
-def train_inception_time(dm, inception_config):
+def train_inception_time(dm, inception_config, checkpoint_filename):
     inception_time = LitInceptionTimeModel(**inception_config)
     trainer = Trainer(accelerator='auto',
                       max_epochs=100,
-                      enable_checkpointing=False,
                       default_root_dir=log_path,
-                      log_every_n_steps=1)
+                      log_every_n_steps=1,
+                      callbacks=[ModelCheckpoint(dirpath=checkpoint_path,
+                                                 monitor='val_loss',
+                                                 every_n_epochs=1,
+                                                 filename=checkpoint_filename)],
+                      )
     trainer.fit(inception_time, datamodule=dm)
-    return inception_time
 
 
-def fit_and_predict_clf(inception_time: LitInceptionTimeModel, dm: KIDataModule):
+def fit_and_predict_clf(dm: KIDataModule, checkpoint_filename):
+    inception_time = LitInceptionTimeModel.load_from_checkpoint(checkpoint_path.joinpath(checkpoint_filename))
+
     # Freeze parameters of the encoder
     inception_time.freeze()
 
