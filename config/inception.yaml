@@ -6,6 +6,6 @@ kernel_sizes: [ 10, 20, 40 ]
 use_residuals: default
 num_pred_classes: 128
 lr: 0.0001
-wd: 0.01
+wd: 0.001
 num_semi_hard_negatives: 128
 anchor_swap: True
