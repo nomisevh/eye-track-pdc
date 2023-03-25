@@ -7,7 +7,7 @@ from torch import nn, argsort, norm
 from torch.nn import TripletMarginLoss
 from torch.nn.functional import normalize
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim.lr_scheduler import CosineAnnealingLR, SequentialLR, LinearLR
 
 
 class InceptionTimeBlock(nn.Module):
@@ -204,5 +204,12 @@ class LitInceptionTimeModel(LightningModule):
 
     def configure_optimizers(self):
         optimizer = AdamW(self.parameters(), lr=self.lr, weight_decay=self.wd)
-        lr_scheduler = CosineAnnealingLR(optimizer, T_max=self.trainer.max_epochs)
+
+        warmup_epochs = self.trainer.max_epochs // 20
+        # Cosine annealing with warmup, to allow use of learning rate scaling rule, see Goyal et al. 2018
+        lr_scheduler = SequentialLR(optimizer, [
+            LinearLR(optimizer, total_iters=warmup_epochs),
+            CosineAnnealingLR(optimizer, T_max=self.trainer.max_epochs - warmup_epochs)
+        ], milestones=[warmup_epochs])
+
         return [optimizer], [lr_scheduler]
