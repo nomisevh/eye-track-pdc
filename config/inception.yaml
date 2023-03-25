@@ -1,12 +1,12 @@
-num_blocks: 3
-in_channels: 6
-out_channels: 32
-bottleneck_channels: 1
-kernel_sizes: [ 10, 20, 40 ]
-use_residuals: default
-num_pred_classes: 128
+depth: 3
+in_dim: 6
+hidden_dim: 32
+bottleneck_dim: 32
+base_kernel_size: 40
+use_residuals: True
 lr: 0.0001
 wd: 0.001
 # num_semi_hard_negatives: 128
 anchor_swap: True
 triplet_margin: 0.2
+normalize_output: True

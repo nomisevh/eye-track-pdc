@@ -11,7 +11,7 @@ from yaml import FullLoader, load as load_yaml
 from datamodule import KIDataModule
 from dataset import KIDataset, train_test_split_stratified
 from model_selection import grid_search_2d, Validator
-from models.inceptiontime import LitInceptionTimeModel
+from models.inceptiontime import LitInceptionTime
 from processor.processor import Leif
 from utils.const import SEED
 from utils.misc import set_random_state
@@ -60,12 +60,12 @@ def main():
 
     # Perform grid search
     _ = grid_search_2d(validator, Callback(), train_val_ds,
-                       bottleneck_channels=[1, 2, 0],
-                       num_pred_classes=[64, 128, 256])
+                       depth=[3],
+                       hidden_dim=[32])
 
 
 def train_inception_time(dm, inception_config, checkpoint_filename):
-    inception_time = LitInceptionTimeModel(**inception_config)
+    inception_time = LitInceptionTime(**inception_config)
     trainer = Trainer(accelerator='auto',
                       max_epochs=100,
                       default_root_dir=log_path,
@@ -79,7 +79,7 @@ def train_inception_time(dm, inception_config, checkpoint_filename):
 
 
 def fit_and_predict_clf(dm: KIDataModule, checkpoint_filename):
-    inception_time = LitInceptionTimeModel.load_from_checkpoint(checkpoint_path.joinpath(checkpoint_filename))
+    inception_time = LitInceptionTime.load_from_checkpoint(checkpoint_path.joinpath(checkpoint_filename))
 
     # Freeze parameters of the encoder
     inception_time.freeze()

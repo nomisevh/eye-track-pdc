@@ -1,173 +1,98 @@
-from typing import Union, List, cast
-
-import torch
-from prettytable import PrettyTable
+from numpy import argsort
 from pytorch_lightning import LightningModule
-from torch import nn, argsort, norm
-from torch.nn import TripletMarginLoss
-from torch.nn.functional import normalize
+from torch import nn, Tensor, concatenate, norm
+from torch.nn import ModuleList, TripletMarginLoss
+from torch.nn.functional import relu, normalize
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import CosineAnnealingLR, SequentialLR, LinearLR
+from torch.optim.lr_scheduler import SequentialLR, CosineAnnealingLR, LinearLR
 
 
-class InceptionTimeBlock(nn.Module):
-    """An inception block consists of an (optional) bottleneck, followed
-    by 3 conv1d layers. Optionally residual connections can be created.
-    """
+class InceptionModule(nn.Module):
+    NUM_FILTER_SETS = 3
 
-    def __init__(self, in_channels: int, out_channels: int,
-                 residual: bool, stride: int = 1, bottleneck_channels: int = 32,
-                 kernel_size: int = 41) -> None:
-        assert kernel_size > 3, "Kernel size must be strictly greater than 3"
+    def __init__(self, in_dim: int, hidden_dim: int, bottleneck_dim: int, base_kernel_size: int,
+                 residual: bool):
+        min_base_kernel_size = 2 ** (self.NUM_FILTER_SETS - 1)
+        assert base_kernel_size >= min_base_kernel_size, f'base kernel size must be {min_base_kernel_size} or greater'
         super().__init__()
 
-        self.use_bottleneck = bottleneck_channels > 0
-        if self.use_bottleneck:
-            self.bottleneck = nn.Conv1d(in_channels, bottleneck_channels, kernel_size=1, bias=False, padding='same')
-        kernel_size_s = [kernel_size // (2 ** i) for i in range(3)]
-        start_channels = bottleneck_channels if self.use_bottleneck else in_channels
-        channels = [start_channels] + [out_channels] * 3
-        self.conv_layers = nn.Sequential(*[
-            nn.Conv1d(in_channels=channels[i], out_channels=channels[i + 1], kernel_size=kernel_size_s[i],
-                      stride=stride, bias=False, padding='same')
-            for i in range(len(kernel_size_s))
+        # The outputs from the filter sets will be concatenated feature-wise along with the parallel low pass filter.
+        out_dim = hidden_dim * (self.NUM_FILTER_SETS + 1)
+        filter_in_dim = in_dim
+        if bottleneck_dim > 0 and in_dim > 1:
+            self.bottleneck = nn.Conv1d(in_dim, bottleneck_dim, kernel_size=1, bias=False, padding='same')
+            filter_in_dim = bottleneck_dim
+
+        kernel_sizes = [base_kernel_size // (2 ** i) for i in range(self.NUM_FILTER_SETS)]
+
+        self.filter_sets = ModuleList([
+            nn.Conv1d(filter_in_dim, hidden_dim, kernel_size=ks, padding='same', bias=False) for ks in kernel_sizes])
+
+        self.bn = nn.BatchNorm1d(out_dim)
+
+        self.parallel_low_pass_filter = nn.Sequential(*[
+            nn.MaxPool1d(kernel_size=3, stride=1, padding=1),
+            nn.Conv1d(in_dim, hidden_dim, kernel_size=1, padding='same', bias=False)
         ])
 
-        self.batchnorm = nn.BatchNorm1d(num_features=channels[-1])
-        self.relu = nn.ReLU()
-
-        self.use_residual = residual
+        # Not sure if residual should be used at every module, but from the paper it doesn't seem to have a significant
+        # effect anyway.
         if residual:
             self.residual = nn.Sequential(*[
-                nn.Conv1d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, stride=stride, bias=False,
-                          padding='same'),
-                nn.BatchNorm1d(out_channels),
-                nn.ReLU()
+                nn.Conv1d(in_dim, out_dim, kernel_size=1, bias=False, padding='same'),
+                # Not sure if it's important that the residual has its own batch norm. Will keep it just in case.
+                nn.BatchNorm1d(out_dim),
             ])
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
+    def forward(self, x: Tensor) -> Tensor:
         org_x = x
-        if self.use_bottleneck:
+        if self.bottleneck is not None:
             x = self.bottleneck(x)
-        x = self.conv_layers(x)
 
-        if self.use_residual:
+        filter_outputs = []
+        for filter_set in self.filter_sets:
+            filter_outputs.append(filter_set(x))
+
+        filter_outputs.append(self.parallel_low_pass_filter(org_x))
+
+        x = concatenate(filter_outputs, dim=1)
+        x = self.bn(x)
+
+        if self.residual is not None:
             x = x + self.residual(org_x)
-        return x
+
+        return relu(x)
 
 
-class LitInceptionTimeModel(LightningModule):
-    """
-    A PyTorch implementation of the InceptionTime model.
-    Paper URL: https://arxiv.org/abs/1909.04939
-    Code URL: https://github.com/okrasolar/pytorch-timeseries/blob/master/src/models/inception.py
-    """
+class LitInceptionTime(LightningModule):
 
-    def __init__(self, num_blocks: int, in_channels: int, out_channels: Union[List[int], int],
-                 bottleneck_channels: Union[List[int], int], kernel_sizes: Union[List[int], int],
-                 use_residuals: Union[List[bool], bool, str] = 'default',
-                 num_pred_classes: int = 1, lr: float = 1e-3, wd: float = 1e-2,
-                 num_semi_hard_negatives: int = None, anchor_swap: bool = True, triplet_margin: float = 0.2) -> None:
-        """
-        Attributes
-        ----------
-        num_blocks:
-            The number of inception blocks to use. One inception block consists
-            of 3 convolutional layers, (optionally) a bottleneck and (optionally) a residual
-            connector
-        in_channels:
-            The number of input channels (i.e. input.shape[-1])
-        out_channels:
-            The number of "hidden channels" to use. Can be a list (for each block) or an
-            int, in which case the same value will be applied to each block
-        bottleneck_channels:
-            The number of channels to use for the bottleneck. Can be list or int. If 0, no
-            bottleneck is applied
-        kernel_sizes:
-            The size of the kernels to use for each inception block. Within each block, each
-            of the 3 convolutional layers will have kernel size
-            `[kernel_size // (2 ** i) for i in range(3)]`
-        num_pred_classes:
-            The number of output classes
-        """
+    def __init__(self, depth: int, in_dim: int, hidden_dim: int, bottleneck_dim: int, base_kernel_size: int,
+                 use_residuals: bool, lr: float = 1e-4, wd: float = 1e-3, num_semi_hard_negatives: int = None,
+                 anchor_swap: bool = True, triplet_margin: float = 0.2, normalize_output: bool = False):
         super().__init__()
-        self.bottleneck_channels = bottleneck_channels
-
-        channels = [in_channels] + cast(List[int], self._expand_to_blocks(out_channels,
-                                                                          num_blocks))
-        bottleneck_channels = cast(List[int], self._expand_to_blocks(bottleneck_channels,
-                                                                     num_blocks))
-        kernel_sizes = cast(List[int], self._expand_to_blocks(kernel_sizes, num_blocks))
-        if use_residuals == 'default':
-            use_residuals = [True if i % 3 == 2 else False for i in range(num_blocks)]
-        use_residuals = cast(List[bool],
-                             self._expand_to_blocks(cast(Union[bool, List[bool]], use_residuals), num_blocks))
-
-        self.blocks = nn.Sequential(*[
-            InceptionTimeBlock(in_channels=channels[i], out_channels=channels[i + 1],
-                               residual=use_residuals[i], bottleneck_channels=bottleneck_channels[i],
-                               kernel_size=kernel_sizes[i])
-            for i in range(num_blocks)
-        ])
-
-        # a global average pooling (i.e. mean of the time dimension) is why
-        # in_features=channels[-1]
-        self.linear = nn.Linear(in_features=channels[-1], out_features=num_pred_classes)
-        self.out_dim = num_pred_classes
-
-        self.loss_fn = TripletMarginLoss(margin=triplet_margin, p=2, swap=anchor_swap)
         self.lr = lr
         self.wd = wd
         self.num_semi_hard_negatives = num_semi_hard_negatives
-        self.anchor_swap = anchor_swap
-        self.init()
+        self.normalize_output = normalize_output
+
+        # The outputs from the filter sets will be concatenated feature-wise along with the parallel low pass filter.
+        intermediate_out_dim = (InceptionModule.NUM_FILTER_SETS + 1) * hidden_dim
+        self.inception_modules = nn.Sequential(*[InceptionModule(in_dim=in_dim if i == 0 else intermediate_out_dim,
+                                                                 hidden_dim=hidden_dim,
+                                                                 bottleneck_dim=bottleneck_dim,
+                                                                 base_kernel_size=base_kernel_size,
+                                                                 residual=use_residuals) for i in range(depth)])
+        # self.linear = Linear()
+        self.loss_fn = TripletMarginLoss(margin=triplet_margin, p=2, swap=anchor_swap)
+
+        self.apply(self.initialize_weights)
         self.save_hyperparameters()
 
-    def count_params(self, verbose: bool = False) -> int:
-        table = PrettyTable(["Modules", "Parameters"])
-        total_params = 0
-        for name, parameter in self.named_parameters():
-            if not parameter.requires_grad:
-                continue
-            param = parameter.numel()
-            table.add_row([name, param])
-            total_params += param
-        if verbose:
-            print(table)
-            print(f"Total Trainable Params: {total_params}")
-        return total_params
+    def forward(self, x: Tensor) -> Tensor:
+        # Pass through inception modules and do global average pooling over the final MTS --> (N, hidden_dim)
+        x = self.inception_modules(x).mean(dim=-1)
 
-    @staticmethod
-    def _expand_to_blocks(value: Union[int, bool, List[int], List[bool]],
-                          num_blocks: int) -> Union[List[int], List[bool]]:
-        if isinstance(value, list):
-            assert len(value) == num_blocks, \
-                f'Length of inputs lists must be the same as num blocks, ' \
-                f'expected length {num_blocks}, got {len(value)}'
-        else:
-            value = [value] * num_blocks
-        return value
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore
-        x = self.blocks(x).mean(dim=-1)  # the mean is the global average pooling
-        # L2 Normalize output dimension to enforce outputs in unit hypersphere
-        return normalize(self.linear(x))
-
-    def init(self) -> 'LitInceptionTimeModel':
-        def initialize_weights(m):
-            if isinstance(m, nn.Conv1d):
-                nn.init.kaiming_uniform_(m.weight.data, nonlinearity='relu')
-                if m.bias is not None:
-                    nn.init.constant_(m.bias.data, 0)
-            elif isinstance(m, nn.BatchNorm1d):
-                nn.init.constant_(m.weight.data, 1)
-                nn.init.constant_(m.bias.data, 0)
-            elif isinstance(m, nn.Linear):
-                nn.init.kaiming_uniform_(m.weight.data)
-                nn.init.constant_(m.bias.data, 0)
-
-        self.apply(initialize_weights)
-        return self.train()
+        return normalize(x) if self.normalize_output else x
 
     def shared_step(self, batch, batch_idx, step):
         anchor, positive, negative = batch
@@ -213,3 +138,16 @@ class LitInceptionTimeModel(LightningModule):
         ], milestones=[warmup_epochs])
 
         return [optimizer], [lr_scheduler]
+
+    @staticmethod
+    def initialize_weights(m):
+        if isinstance(m, nn.Conv1d):
+            nn.init.kaiming_uniform_(m.weight.data, nonlinearity='relu')
+            if m.bias is not None:
+                nn.init.constant_(m.bias.data, 0)
+        elif isinstance(m, nn.BatchNorm1d):
+            nn.init.constant_(m.weight.data, 1)
+            nn.init.constant_(m.bias.data, 0)
+        elif isinstance(m, nn.Linear):
+            nn.init.kaiming_uniform_(m.weight.data)
+            nn.init.constant_(m.bias.data, 0)
