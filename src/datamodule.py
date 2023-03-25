@@ -38,6 +38,8 @@ class KIDataModule(LightningDataModule):
         if processor_config is not None:
             self.processor = Leif(processor_config)
 
+        self.save_hyperparameters()
+
     def setup(self, stage: str):
         # Assign train/val datasets for use in dataloaders
         if stage == "fit" and self.train_ds is None:
