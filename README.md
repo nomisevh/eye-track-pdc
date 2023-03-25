@@ -31,6 +31,19 @@ conda env update --file conda/[OS].yaml --prune`
 We use a private dataset from the Karolinska Institute for our experiments. For details, see our paper **todo**.
 For access to the data, contact the authors.
 
+### Logging
+
+Logging is done via Neptune. For privacy reasons the neptune config is not tracked in version control. In order to use
+with neptune, create a config on the form:
+
+```yaml
+project: <str>
+api_key: <str>
+capture_hardware_metrics: True
+# async (default), offline, debug
+mode: async
+```
+
 ### Project Structure
 
 📂`conda`: required package versions for different operating systems
