@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from processor.interface import MainProcessor, BatchProcessor, Scissor
 from utils.data import ZScoreMask
-from utils.ki import SAMPLE_RATE
+from utils.ki import SAMPLE_RATE, INVISIBLE_TARGET_DURATION
 
 
 class Leif(MainProcessor):
@@ -22,7 +22,8 @@ class Leif(MainProcessor):
     def __init__(self, config: dict):
         self.sanitizer = FileFilter(**config['sanitation'])
         self.file_normalizer = SaccadeAmplitudeNormalizer(**config['file_normalization'])
-        self.scissor = FocusScissor(sample_rate=SAMPLE_RATE, **config['segmentation'])
+        self.scissor = FocusScissor(sample_rate=SAMPLE_RATE, invisible_target_duration=INVISIBLE_TARGET_DURATION,
+                                    **config['segmentation'])
         self.channels = config['channels']
 
     def __call__(self, frames: List[DataFrame], train=True) -> List[List[DataFrame]]:
@@ -48,14 +49,13 @@ class Leif(MainProcessor):
                 # Select channels
                 segmented_frame[i] = segment[self.channels]
 
-            # update minimum segment length
+            # Update minimum segment length
             min_segment_length = min(min_segment_length, min(map(lambda s: s.shape[0], segmented_frame)))
             # Append to segment list for file
             trials.append(segmented_frame)
 
-        # Sanitize segments w.r.t all files
         # TODO the min segment length might have to be synced between train and test
-        # Trim segments
+        # Trim segments to ensure equal length. Trim from the start of the segment since that is the noisiest part.
         for i, trial in enumerate(trials):
             for j, segment in enumerate(trial):
                 trials[i][j] = segment[-min_segment_length:]
@@ -155,10 +155,14 @@ class FocusScissor(Scissor):
     Segments a file such that the segments capture the periods where the individual is focusing in between saccades.
     """
 
-    def __init__(self, *, sample_rate, post_saccade_time_threshold, exclude_first):
+    def __init__(self, *, sample_rate, post_saccade_time_threshold, exclude_first, invisible_target_duration,
+                 invisible_target_mode=''):
         self.sample_rate = sample_rate
         self.d = post_saccade_time_threshold
         self.exclude_first = exclude_first
+        self.invisible_target_duration = invisible_target_duration
+        # Can take values 'exclude' or 'only'
+        self.invisible_target_mode = invisible_target_mode
 
     def __call__(self, frame: DataFrame, **kwargs) -> List[DataFrame]:
         th = int(self.sample_rate * self.d)
@@ -166,12 +170,17 @@ class FocusScissor(Scissor):
         target = frame["target"]
         anchors = [0, *target[target.diff().fillna(0) != 0].index.tolist()]
         segments = []
-        min_seg_length = inf
         for i in range(0, len(anchors) - 1, 2):
             if i == 0 and self.exclude_first:
                 continue
 
             s = frame.iloc[anchors[i] + th:anchors[i + 1], :].copy()
+
+            if self.invisible_target_mode == 'exclude':
+                s = self.exclude_invisible_target(s)
+            elif self.invisible_target_mode == 'only':
+                s = self.only_use_visible_target(s)
+
             # Add the initial timestamp of the segment
             start_time = s["Time (ms)"].iloc[0]
             s["Time (ms)"] -= start_time
@@ -180,6 +189,12 @@ class FocusScissor(Scissor):
             segments.append(s)
 
         return segments
+
+    def exclude_invisible_target(self, segment: DataFrame):
+        return segment.iloc[:self.invisible_target_duration, :].copy()
+
+    def only_use_visible_target(self, segment: DataFrame):
+        return segment.iloc[-self.invisible_target_duration:, :].copy
 
 
 def compute_velocity(df: DataFrame) -> DataFrame:

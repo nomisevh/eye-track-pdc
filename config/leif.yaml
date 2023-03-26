@@ -13,6 +13,7 @@ file_normalization:
 segmentation:
   post_saccade_time_threshold: 1
   exclude_first: true
+  # invisible_target_mode: exclude
 channels:
   - position
   - drift

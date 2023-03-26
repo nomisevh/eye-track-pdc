@@ -20,6 +20,8 @@ AXIS: Dict[str, int] = {'horiz': 0, 'vert': 1}
 SACCADE: Dict[str, int] = {'pro': 0, 'anti': 1}
 FILENAME_REGEX: RegexPattern = compile_regex(r'(\d+?)_(\w+?)_\w+?_(\w+?)_\d+?_(\w+)?[.csv]?')
 SAMPLE_RATE = 300
+# The length of the time window where the target is invisible prior to a saccade.
+INVISIBLE_TARGET_DURATION = 0.2
 
 
 def load_data(train: bool, sources: Iterable[str]):
