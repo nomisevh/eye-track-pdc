@@ -20,10 +20,10 @@ from utils.ki import LABELS as KI_LABELS, FILENAME_REGEX as KI_FILENAME_REGEX, A
 from utils.misc import torch_unique_index
 from utils.path import ki_data_tmp_path, config_path
 
+Signature = namedtuple('Signature', ['x', 'y', 'z', 'r', 'a', 's'])
+
 
 class KIDataset(Dataset):
-    Signature = namedtuple('Signature', ['x', 'y', 'z', 'r', 'a', 's'])
-
     def __init__(self, *, data_processor: MainProcessor, train: bool, bundle_as_trials=False, use_triplets=False,
                  exclude=None, sources=('HC', 'PD_OFF', 'PD_ON')):
         self.use_triplets = use_triplets
@@ -71,21 +71,21 @@ class KIDataset(Dataset):
             self.exclude_data(exclude)
 
     def __getitem__(self, item):
-        anchor = self.Signature(self.x[item], self.y[item], self.z[item], self.r[item], self.a[item], self.s[item])
+        anchor = Signature(self.x[item], self.y[item], self.z[item], self.r[item], self.a[item], self.s[item])
         if not self.use_triplets:
             return anchor
 
         # Compute the indices of all items that have the same label but are from a different individual than the anchor
         positive_indices = argwhere(logical_and(self.y == anchor.y, self.z != anchor.z))  # noqa
         positive_item = random.choice(positive_indices).item()
-        positive = self.Signature(self.x[positive_item], self.y[positive_item], self.z[positive_item],
-                                  self.r[positive_item], self.a[positive_item], self.s[positive_item])
+        positive = Signature(self.x[positive_item], self.y[positive_item], self.z[positive_item],
+                             self.r[positive_item], self.a[positive_item], self.s[positive_item])
 
         # Compute the indices of all items that do not belong to the same patient as the anchor
         negative_indices = argwhere(self.y != anchor.y)  # noqa
         negative_item = random.choice(negative_indices).item()
-        negative = self.Signature(self.x[negative_item], self.y[negative_item], self.z[negative_item],
-                                  self.r[negative_item], self.a[negative_item], self.s[negative_item])
+        negative = Signature(self.x[negative_item], self.y[negative_item], self.z[negative_item],
+                             self.r[negative_item], self.a[negative_item], self.s[negative_item])
 
         return anchor, positive, negative
 
@@ -129,7 +129,7 @@ def populate_ki_segments(segmented_files, filenames):
     for trial, (segments, filename) in enumerate(zip(segmented_files, filenames)):
         individual, group, axis, saccade = KI_FILENAME_REGEX.findall(filename)[0]
         for seg in segments:
-            datapoints.append(KIDataset.Signature(
+            datapoints.append(Signature(
                 x=seg.values,
                 y=KI_LABELS[group],
                 z=int(individual),
@@ -144,7 +144,7 @@ def populate_ki_trials(segmented_files, filenames):
     datapoints = []
     for trial, (segments, filename) in enumerate(zip(segmented_files, filenames)):
         individual, group, axis, saccade = KI_FILENAME_REGEX.findall(filename)[0]
-        datapoints.append(KIDataset.Signature(
+        datapoints.append(Signature(
             x=[s.values for s in segments],
             y=KI_LABELS[group],
             z=int(individual),

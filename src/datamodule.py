@@ -9,7 +9,7 @@ from utils.data import binarize
 
 class KIDataModule(LightningDataModule):
     def __init__(self, train_ds=None, val_ds=None, processor_config=None, bundle_as_trials=False, use_triplets=False,
-                 val_size=0.2, binary_classification=False, batch_size=256):
+                 val_size=0.2, binary_classification=False, batch_size=256, num_workers=0):
         """
         :param train_ds: optional prepared train dataset
         :param val_ds: optional prepared validation dataset
@@ -34,6 +34,7 @@ class KIDataModule(LightningDataModule):
         self.val_size = val_size
         self.binary_classification = binary_classification
         self.batch_size = batch_size
+        self.num_workers = num_workers
 
         if processor_config is not None:
             self.processor = Leif(processor_config)
@@ -65,13 +66,16 @@ class KIDataModule(LightningDataModule):
     def train_dataloader(self):
         return DataLoader(self.train_ds,
                           batch_size=len(self.train_ds) if self.batch_size == -1 else self.batch_size,
-                          sampler=ImbalancedDatasetSampler(self.train_ds, callback_get_label=lambda item: item.y))
+                          sampler=ImbalancedDatasetSampler(self.train_ds, callback_get_label=lambda item: item.y),
+                          num_workers=self.num_workers)
 
     def val_dataloader(self):
-        return DataLoader(self.val_ds, batch_size=len(self.val_ds) if self.batch_size == -1 else self.batch_size)
+        return DataLoader(self.val_ds, batch_size=len(self.val_ds) if self.batch_size == -1 else self.batch_size,
+                          num_workers=self.num_workers)
 
     def test_dataloader(self):
-        return DataLoader(self.test_ds, batch_size=len(self.test_ds) if self.batch_size == -1 else self.batch_size)
+        return DataLoader(self.test_ds, batch_size=len(self.test_ds) if self.batch_size == -1 else self.batch_size,
+                          num_workers=self.num_workers)
 
     def set_use_triplets(self, value: bool):
         self.train_ds.use_triplets = value
