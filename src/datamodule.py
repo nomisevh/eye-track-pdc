@@ -39,7 +39,7 @@ class KIDataModule(LightningDataModule):
         if processor_config is not None:
             self.processor = Leif(processor_config)
 
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore=['train_ds', 'test_ds', 'train_val_ds', 'val_ds'])
 
     def setup(self, stage: str):
         # Assign train/val datasets for use in dataloaders
