@@ -158,15 +158,13 @@ class FocusScissor(Scissor):
     def __init__(self, *, sample_rate, post_saccade_time_threshold, exclude_first, invisible_target_duration,
                  invisible_target_mode=''):
         self.sample_rate = sample_rate
-        self.d = post_saccade_time_threshold
+        self.post_saccade_threshold = int(sample_rate * post_saccade_time_threshold)
         self.exclude_first = exclude_first
-        self.invisible_target_duration = invisible_target_duration
+        self.invisible_target_samples = int(invisible_target_duration * sample_rate)
         # Can take values 'exclude' or 'only'
         self.invisible_target_mode = invisible_target_mode
 
     def __call__(self, frame: DataFrame, **kwargs) -> List[DataFrame]:
-        th = int(self.sample_rate * self.d)
-
         target = frame["target"]
         anchors = [0, *target[target.diff().fillna(0) != 0].index.tolist()]
         segments = []
@@ -174,7 +172,7 @@ class FocusScissor(Scissor):
             if i == 0 and self.exclude_first:
                 continue
 
-            s = frame.iloc[anchors[i] + th:anchors[i + 1], :].copy()
+            s = frame.iloc[anchors[i] + self.post_saccade_threshold:anchors[i + 1], :].copy()
 
             if self.invisible_target_mode == 'exclude':
                 s = self.exclude_invisible_target(s)
@@ -191,10 +189,10 @@ class FocusScissor(Scissor):
         return segments
 
     def exclude_invisible_target(self, segment: DataFrame):
-        return segment.iloc[:self.invisible_target_duration, :].copy()
+        return segment.iloc[:-self.invisible_target_samples, :].copy()
 
     def only_use_visible_target(self, segment: DataFrame):
-        return segment.iloc[-self.invisible_target_duration:, :].copy
+        return segment.iloc[-self.invisible_target_samples:, :].copy()
 
 
 def compute_velocity(df: DataFrame) -> DataFrame:
