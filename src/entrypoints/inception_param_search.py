@@ -1,3 +1,4 @@
+import os.path
 from itertools import chain
 from warnings import filterwarnings
 
@@ -42,6 +43,9 @@ def main():
             dm.setup(stage='fit')
 
             checkpoint_filename = f'{"-".join(map(str, chain(*kwargs.items())))}-iter-{iteration}'
+
+            # If a checkpoint with the same filename already exists, it would cause the prediction to use that instead.
+            assert not checkpoint_exist(f'{checkpoint_filename}.ckpt'), 'checkpoint already exists'
 
             # Overwrite InceptionTime config
             train_inception_time(dm,
@@ -109,6 +113,10 @@ def fit_and_predict_clf(dm: KIDataModule, checkpoint_filename):
 
     # Compute and return metric
     return f1_score(val_batch.y, pred, average='macro')
+
+
+def checkpoint_exist(filename):
+    return os.path.exists(checkpoint_path.joinpath(filename))
 
 
 if __name__ == '__main__':
