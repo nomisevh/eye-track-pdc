@@ -8,13 +8,14 @@ from utils.data import binarize
 
 
 class KIDataModule(LightningDataModule):
-    def __init__(self, train_ds=None, val_ds=None, processor_config=None, bundle_as_trials=False, use_triplets=False,
+    def __init__(self, train_ds=None, val_ds=None, processor_config=None, bundle_as_experiments=False,
+                 use_triplets=False,
                  val_size=0.2, binary_classification=False, batch_size=256, num_workers=0):
         """
         :param train_ds: optional prepared train dataset
         :param val_ds: optional prepared validation dataset
         :param processor_config: config for the data processor. If train_ds is not passed, this is a mandatory argument.
-        :param bundle_as_trials: whether to bundle datapoints by trials
+        :param bundle_as_experiments: whether to bundle datapoints by experiment
         :param use_triplets: whether to return triplets
         :param val_size: the relative size of the validation split
         :param binary_classification: whether to binarize the labels
@@ -29,7 +30,7 @@ class KIDataModule(LightningDataModule):
             self.val_ds = val_ds
             self.val_ds.use_triplets = use_triplets
 
-        self.bundle_as_trials = bundle_as_trials
+        self.bundle_as_experiments = bundle_as_experiments
         self.use_triplets = use_triplets
         self.val_size = val_size
         self.binary_classification = binary_classification
@@ -46,7 +47,7 @@ class KIDataModule(LightningDataModule):
         if stage == "fit" and self.train_ds is None:
             self.train_val_ds = KIDataset(data_processor=self.processor,
                                           train=True,
-                                          bundle_as_trials=self.bundle_as_trials,
+                                          bundle_as_experiments=self.bundle_as_experiments,
                                           use_triplets=self.use_triplets)
             self.train_ds, self.val_ds = train_test_split_stratified(self.train_val_ds, test_size=self.val_size)
 
@@ -54,7 +55,7 @@ class KIDataModule(LightningDataModule):
         if stage == "test":
             self.test_ds = KIDataset(data_processor=self.processor,
                                      train=False,
-                                     bundle_as_trials=self.bundle_as_trials,
+                                     bundle_as_experiments=self.bundle_as_experiments,
                                      use_triplets=False)
 
         # Binarize dataset after split to make sure split is stratified w.r.t all three classes

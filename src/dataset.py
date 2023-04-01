@@ -24,11 +24,11 @@ Signature = namedtuple('Signature', ['x', 'y', 'z', 'r', 'a', 's'])
 
 
 class KIDataset(Dataset):
-    def __init__(self, *, data_processor: MainProcessor, train: bool, bundle_as_trials=False, use_triplets=False,
+    def __init__(self, *, data_processor: MainProcessor, train: bool, bundle_as_experiments=False, use_triplets=False,
                  exclude=None, sources=('HC', 'PD_OFF', 'PD_ON')):
         self.use_triplets = use_triplets
 
-        file_path = ki_data_tmp_path.joinpath(self.format_filename(train, bundle_as_trials, sources))
+        file_path = ki_data_tmp_path.joinpath(self.format_filename(train, bundle_as_experiments, sources))
 
         # Use cached version of dataset if available
         if isfile(file_path):
@@ -39,10 +39,10 @@ class KIDataset(Dataset):
 
             segmented_files = data_processor(dataframes, train=train)
 
-            if bundle_as_trials:
-                x, y, z, r, a, s = populate_ki_trials(segmented_files, filenames)
+            if bundle_as_experiments:
+                x, y, z, r, a, s = populate_ki_experiments(segmented_files, filenames)
                 # Tensor with shape (N, L, M, T) holding the multivariate time series.
-                # N is number of data points, L is the number of segments in each trial, M is the dimensionality and
+                # N is number of data points, L is the number of segments in each experiment, M is the dimensionality and
                 # T is the length of the series.
                 self.x = tensor(array(x)).float().permute(0, 1, 3, 2)
             else:
@@ -55,7 +55,7 @@ class KIDataset(Dataset):
             self.y = tensor(y).float()
             # Tensor with shape (N) holding which patient the data points belong to
             self.z = tensor(z, dtype=torch_int)
-            # Tensor with shape (N) holding which trial each segment belongs to
+            # Tensor with shape (N) holding which experiment each segment belongs to
             self.r = tensor(r, dtype=torch_int)
             # Tensor with shape (N) holding the axis each segment is aligned with (0:'horiz', 1:'vert')
             self.a = tensor(a, dtype=torch_int)
@@ -140,15 +140,15 @@ def populate_ki_segments(segmented_files, filenames):
     return zip(*datapoints)
 
 
-def populate_ki_trials(segmented_files, filenames):
+def populate_ki_experiments(segmented_files, filenames):
     datapoints = []
-    for trial, (segments, filename) in enumerate(zip(segmented_files, filenames)):
+    for experiment, (segments, filename) in enumerate(zip(segmented_files, filenames)):
         individual, group, axis, saccade = KI_FILENAME_REGEX.findall(filename)[0]
         datapoints.append(Signature(
             x=[s.values for s in segments],
             y=KI_LABELS[group],
             z=int(individual),
-            r=trial,
+            r=experiment,
             a=KI_AXIS[axis],
             s=KI_SACCADE[saccade],
         ))
@@ -180,7 +180,7 @@ def test():
 
     processor = Leif(config)
 
-    ds = KIDataset(data_processor=processor, train=True, bundle_as_trials=False, use_triplets=False)
+    ds = KIDataset(data_processor=processor, train=True, bundle_as_experiments=False, use_triplets=False)
     # plot_series_samples(ds.x[:, 0], labels=ds.y, n=10)
 
     binarize(ds)

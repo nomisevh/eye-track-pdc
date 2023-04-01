@@ -30,7 +30,7 @@ def main():
         rocket_config = load_yaml(reader, Loader=FullLoader)
 
     dm = KIDataModule(processor_config=processor_config,
-                      bundle_as_trials=False,
+                      bundle_as_experiments=False,
                       binary_classification=True,
                       batch_size=-1)
     dm.setup('fit')
