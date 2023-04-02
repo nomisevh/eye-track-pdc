@@ -1,7 +1,11 @@
 import numpy as np
 import torch
+from matplotlib import colors as m_colors
 from matplotlib import pyplot as plt
+from sklearn.manifold import TSNE
 from torch import Tensor
+
+from utils.data import normalize
 
 
 def plot_series_samples(data: Tensor, n: int, labels: Tensor, seed: int = 42):
@@ -33,3 +37,36 @@ def plot_series_samples(data: Tensor, n: int, labels: Tensor, seed: int = 42):
     ax.legend(ncol=2)
     plt.show()
     # fig.savefig('samples.png')
+
+
+def visualize_latent_space(tsne: TSNE, test_features: Tensor, test_batch, labels):
+    manifold = tsne.fit_transform(test_features)
+
+    colors = ['blue', 'darkorange', 'green']
+    cmap = m_colors.ListedColormap(colors)
+
+    fig, ax = plt.subplots()
+    scatter = ax.scatter(manifold[:, 0], manifold[:, 1], c=test_batch.y, s=20, alpha=0.8, cmap=cmap)
+    ax.legend(handles=scatter.legend_elements()[0], labels=labels)
+    plt.show()
+
+
+def plot_top_eigenvalues(test_features, n=100):
+    normalized = normalize(test_features.detach())
+
+    u, sigma, v_t = np.linalg.svd(normalized, full_matrices=False)
+
+    # Compute eigenvalues from singular values
+    eigenvalues = sigma ** 2 / np.sum(sigma ** 2)
+
+    top_eigenvalues = eigenvalues[:n]
+    explained_information = [sum(eigenvalues[:i]) for i in range(1, len(top_eigenvalues) + 1)]
+
+    fig, ax = plt.subplots()
+    ax2 = ax.twinx()
+    ax.plot(np.arange(len(top_eigenvalues)), top_eigenvalues, label='explained variance')
+    ax2.plot(np.arange(len(explained_information)), explained_information, label='cumulative explained variance', c='r')
+    ax.set_title(f'Top {n} eigenvalues for ROCKET Embeddings')
+    ax.legend(loc='lower right')
+    ax2.legend(loc='center right')
+    plt.show()
