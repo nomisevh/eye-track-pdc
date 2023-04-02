@@ -1,17 +1,38 @@
+# The parameters for the file sanitation
 sanitation:
+  # The median absolute deviation (MAD) threshold for the position
+  # i.e. how many MADs away from the median the data point can be.
   position_thresholds:
+    # The threshold for the maximum value heuristic
     max_value: 3.0
+    # The threshold for the mean velocity heuristic
     mean_vel: 3.0
+  # The median absolute deviation (MAD) threshold for the drift
   drift_thresholds:
+    # The threshold for the maximum value heuristic
     max_value: 3.0
+    # The threshold for the mean velocity heuristic
     mean_vel: 3.0
+
+# The parameters for the file normalization
 file_normalization:
+  # The width of the trailing window for the median approximation of the saccade amplitude
   trailing_window_width: 150  # datapoints
+  # The factor by which the signal is scaled after normalization
   scaling_factor: 10
+
+# The parameters for segmenting the complete time series into inter-saccadic segments
 segmentation:
+  # The time to wait after a saccade before the next segment
   post_saccade_time_threshold: 1
+  # Whether to exclude the first segment (due to poor calibration)
   exclude_first: true
+  # How to treat the part of the segment where the target is invisible.
+  # 'exclude' means that the part where the target is invisible is excluded from the segment.
+  # 'only' means that only the part where the target is invisible is included in the segment.
   # invisible_target_mode: exclude
+
+# The channels to include in the dataset
 channels:
   - position
   - drift
