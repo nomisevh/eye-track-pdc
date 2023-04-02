@@ -97,3 +97,6 @@ class KIDataModule(LightningDataModule):
         self.train_val_ds.batch()
         if self.test_ds is not None:
             self.test_ds.batch()
+
+    def class_names(self):
+        return ['HC', 'PD ON', 'PD OFF'] if not self.binary_classification else ['HC', 'PD']

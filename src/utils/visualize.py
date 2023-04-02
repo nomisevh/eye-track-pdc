@@ -2,7 +2,6 @@ import numpy as np
 import torch
 from matplotlib import colors as m_colors
 from matplotlib import pyplot as plt
-from sklearn.manifold import TSNE
 from torch import Tensor
 
 from utils.data import normalize
@@ -39,16 +38,15 @@ def plot_series_samples(data: Tensor, n: int, labels: Tensor, seed: int = 42):
     # fig.savefig('samples.png')
 
 
-def visualize_latent_space(tsne: TSNE, test_features: Tensor, test_batch, labels):
-    manifold = tsne.fit_transform(test_features)
-
+def visualize_latent_space(manifold, batch, labels):
     colors = ['blue', 'darkorange', 'green']
     cmap = m_colors.ListedColormap(colors)
 
     fig, ax = plt.subplots()
-    scatter = ax.scatter(manifold[:, 0], manifold[:, 1], c=test_batch.y, s=20, alpha=0.8, cmap=cmap)
+    scatter = ax.scatter(manifold[:, 0], manifold[:, 1], c=batch.y, s=20, alpha=0.8, cmap=cmap)
     ax.legend(handles=scatter.legend_elements()[0], labels=labels)
     plt.show()
+    return fig, ax
 
 
 def plot_top_eigenvalues(test_features, n=100):

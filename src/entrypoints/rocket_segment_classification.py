@@ -51,8 +51,6 @@ def main():
     # Initialize dimensionality reducer
     tsne = TSNE(n_components=2, perplexity=50)
 
-    # For evaluation metrics
-    labels = ['HC', 'PD']
     # Batch is entire dataset
     train_batch = next(iter(dm.train_dataloader()))
     test_batch = next(iter(dm.test_dataloader()))
@@ -65,14 +63,15 @@ def main():
     plot_top_eigenvalues(test_features)
 
     # Visualize the latent neighborhoods with TSNE
-    visualize_latent_space(tsne, test_features, test_batch, labels)
+    manifold = tsne.fit_transform(test_features)
+    visualize_latent_space(manifold, test_batch, dm.class_names())
 
     for clf_name, clf in [('ridge classifier', ridge_clf), ('random forest classifier', forest_clf)]:
         # Fit classifier to the rocket features
         clf.fit(train_features, train_batch.y)
 
         # Evaluate on the test set
-        evaluate(test_features, clf, test_batch, labels, clf_name)
+        evaluate(test_features, clf, test_batch, dm.class_names(), clf_name)
 
 
 def evaluate(test_features: Tensor, clf: LinearModel, test_batch: Signature, labels: Sequence[str], clf_name: str):
