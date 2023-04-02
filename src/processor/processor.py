@@ -4,7 +4,6 @@ This file hosts our data preprocessing pipeline including sanitation, normalizat
 from typing import List
 
 import numpy as np
-from numpy import finfo
 from pandas import DataFrame
 from torch import inf
 from tqdm import tqdm
@@ -136,7 +135,6 @@ class FileFilter(BatchProcessor):
             series = [df[header] for df in frames]
             heuristics = {
                 'max value': [s.abs().max() for s in series],
-                'snr': [s.abs().max() / (s.var() + finfo(float).eps) for s in series],
                 'mean velocity': [s.diff().fillna(0).abs().mean(axis=0) for s in series]
             }
 
