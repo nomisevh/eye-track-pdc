@@ -19,8 +19,6 @@ def main():
     # Load configs
     with open(config_path.joinpath('leif.yaml')) as reader:
         processor_config = load_yaml(reader, Loader=FullLoader)
-    with open(config_path.joinpath('inception.yaml')) as reader:
-        inception_config = load_yaml(reader, Loader=FullLoader)
 
     # Load InceptionTime checkpoint
     model = LitInceptionTime.load_from_checkpoint(checkpoint_path.joinpath('winner.ckpt'))
@@ -53,14 +51,14 @@ def main():
     # Perform grid search
     _ = grid_search_2d(validator, Callback(), train_val_ds,
                        max_samples=[0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
-                       max_depth=[2, 3])
+                       n_estimators=[100, 200, 300, 400])
 
 
 def fit_and_predict_clf(feature_extractor: nn.Module, dm: KIDataModule, **kwargs):
     params = {
         'n_jobs': 1,
-        'n_estimators': 50,
-        'max_samples': 0.826,
+        'n_estimators': 200,
+        'max_samples': 0.6,
         'max_depth': 2,
         **kwargs
     }

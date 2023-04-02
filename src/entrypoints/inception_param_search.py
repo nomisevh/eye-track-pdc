@@ -64,8 +64,8 @@ def main():
 
     # Perform grid search
     _ = grid_search_2d(validator, Callback(), train_val_ds,
-                       depth=[3],
-                       hidden_dim=[32])
+                       depth=[2],
+                       bottleneck_dim=[46])
 
 
 def train_inception_time(dm, inception_config, checkpoint_filename):
