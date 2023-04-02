@@ -71,14 +71,14 @@ mode: async
 ## How To Run <a href="#run"></a>
 
 After making sure that the developmental environment is set up and the data is in the `data/ki` directory, you can
-run the various experiments by their respective jupyter notebooks in the `src` directory.
+run the various experiments by their respective entrypoints in the `src/entrypoints` directory.
 
 ### Experiments
 
-- Classify time series segments with ROCKET and classic ML classifiers `src/rocket_segment_classification.ipynb`
-- Train InceptionTime to extract features from MTS data `src/inception_feature_extraction.ipynb`
+- Classify time series segments with ROCKET and classic ML
+  classifiers `src/entrypoints/rocket_segment_classification.py`
 - Classify time series segments with InceptionTime and classic ML
-  classifiers `src/inception_segment_classification.ipynb`
+  classifiers `src/entrypoints/inception_segment_classification.py`
 - &lt;we will update this list with new experiments&gt;
 
  
