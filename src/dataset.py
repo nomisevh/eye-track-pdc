@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 from numpy import array
 from sklearn.model_selection import train_test_split
 from torch import tensor, int as torch_int, bool as torch_bool, save, load, isin, logical_not, argwhere, \
-    logical_and, Tensor, zeros, logical_or
+    logical_and, Tensor, zeros, logical_or, argsort, bincount, stack
 from torch.utils.data import Dataset
 from yaml import load as load_yaml, FullLoader
 
@@ -118,6 +118,31 @@ class KIDataset(Dataset):
         for attr, value in self.__dict__.items():
             if isinstance(value, Tensor):
                 setattr(self, attr, value[~exclude_items])
+
+    # Flattens x to extract the individual segments from experiments.
+    def flatten(self):
+        # Save the original shape of x
+        original_shape = self.x.shape
+        self.x = self.x.view(-1, self.x.shape[-2], self.x.shape[-1])
+
+        # Expand y, z, r, a and s to match the new shape of x
+        for attr in ['y', 'z', 'r', 'a', 's']:
+            setattr(self, attr, getattr(self, attr).repeat_interleave(original_shape[1], dim=0))
+
+    # Batches the segments into experiments according to the r attribute.
+    def batch(self):
+        sorting_indices = argsort(self.r)
+        # Compute the number of segments in each experiment.
+        batch_sizes = bincount(self.r)
+        # Since the segments are split train/val, there will be some empty experiments. Remove them.
+        batch_sizes = batch_sizes[batch_sizes > 0]
+
+        # Sort the segments by experiment, batch them, and stack them into a tensor
+        self.x = stack(self.x[sorting_indices].split(batch_sizes.tolist()))
+        # Only keep one entry per experiment for the other attributes
+        for attr in ['y', 'z', 'r', 'a', 's']:
+            entries_per_experiment = getattr(self, attr)[sorting_indices].split(batch_sizes.tolist())
+            setattr(self, attr, stack([entries[0] for entries in entries_per_experiment]))
 
     @staticmethod
     def format_filename(train, bundle_as_trials, sources):

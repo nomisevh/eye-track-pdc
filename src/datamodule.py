@@ -81,3 +81,19 @@ class KIDataModule(LightningDataModule):
     def set_use_triplets(self, value: bool):
         self.train_ds.use_triplets = value
         self.val_ds.use_triplets = value
+
+    # Flattens the datasets, i.e. removes the experiment dimension
+    def flatten(self):
+        self.train_ds.flatten()
+        self.val_ds.flatten()
+        self.train_val_ds.flatten()
+        if self.test_ds is not None:
+            self.test_ds.flatten()
+
+    # Batches the datasets, i.e. adds the experiment dimension
+    def batch(self):
+        self.train_ds.batch()
+        self.val_ds.batch()
+        self.train_val_ds.batch()
+        if self.test_ds is not None:
+            self.test_ds.batch()
