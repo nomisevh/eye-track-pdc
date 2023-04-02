@@ -3,7 +3,6 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import NeptuneLogger
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import f1_score, accuracy_score
-from sklearn.svm import SVC
 from yaml import load as load_yaml, FullLoader
 
 from datamodule import KIDataModule
@@ -48,9 +47,6 @@ def main():
     dm.set_use_triplets(False)
     dm.batch_size = -1
 
-    # For evaluation metrics
-    labels = ['HC', 'PD']
-
     # trainer.fit(classifier, datamodule=dm)
 
     # Freeze parameters of the encoder
@@ -62,12 +58,6 @@ def main():
         n_estimators=200,
         max_samples=0.6,
         max_depth=2
-    )
-    svm_clf = SVC(
-        C=1,
-        kernel='rbf',
-        gamma='scale',
-        probability=True
     )
 
     # Configure data module for fitting the entire dataset with classifier
@@ -100,8 +90,9 @@ def main():
     attribute_importance = {
         'vertical': compute_attribute_importance(val_batch.a, pred, val_batch.y),
         'horizontal': compute_attribute_importance(1 - val_batch.a, pred, val_batch.y),
-        'prosaccade': compute_attribute_importance(val_batch.s, pred, val_batch.y),
-        'antisaccade': compute_attribute_importance(1 - val_batch.s, pred, val_batch.y),
+        'prosaccade': compute_attribute_importance(1 - val_batch.s, pred, val_batch.y),
+        'antisaccade': compute_attribute_importance(val_batch.s, pred, val_batch.y),
+        'horizontal antisaccade': compute_attribute_importance(val_batch.s * (1 - val_batch.a), pred, val_batch.y),
     }
 
     print(attribute_importance)
