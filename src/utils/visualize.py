@@ -38,14 +38,15 @@ def plot_series_samples(data: Tensor, n: int, labels: Tensor, seed: int = 42):
     # fig.savefig('samples.png')
 
 
-def visualize_latent_space(manifold, batch, labels):
+def visualize_latent_space(manifold, labels, class_names, show=True):
     colors = ['blue', 'darkorange', 'green']
     cmap = m_colors.ListedColormap(colors)
 
     fig, ax = plt.subplots()
-    scatter = ax.scatter(manifold[:, 0], manifold[:, 1], c=batch.y, s=20, alpha=0.8, cmap=cmap)
-    ax.legend(handles=scatter.legend_elements()[0], labels=labels)
-    plt.show()
+    scatter = ax.scatter(manifold[:, 0], manifold[:, 1], c=labels, s=20, alpha=0.8, cmap=cmap)
+    ax.legend(handles=scatter.legend_elements()[0], labels=class_names)
+    if show:
+        plt.show()
     return fig, ax
 
 

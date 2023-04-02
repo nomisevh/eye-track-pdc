@@ -64,7 +64,7 @@ def main():
 
     # Visualize the latent neighborhoods with TSNE
     manifold = tsne.fit_transform(test_features)
-    visualize_latent_space(manifold, test_batch, dm.class_names())
+    visualize_latent_space(manifold, test_batch.y, dm.class_names())
 
     for clf_name, clf in [('ridge classifier', ridge_clf), ('random forest classifier', forest_clf)]:
         # Fit classifier to the rocket features
