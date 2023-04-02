@@ -1,7 +1,7 @@
-depth: 3
+depth: 2
 in_dim: 6
 hidden_dim: 32
-bottleneck_dim: 32
+bottleneck_dim: 46
 base_kernel_size: 32
 use_residuals: True
 lr: 0.001
