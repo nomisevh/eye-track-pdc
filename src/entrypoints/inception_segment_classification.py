@@ -92,12 +92,24 @@ def main():
     val_embeddings = model(val_batch.x)
     pred = forest_clf.predict(val_embeddings.detach())
 
-    # The SVMClassifier maps the targets to {-1, 1}, but our labels are {0, 1}
-    pred[pred < 0] = 0
-
     # Compute and return metric
     print(f"f1: {f1_score(val_batch.y, pred, average='macro')}")
     print(f"accuracy: {accuracy_score(val_batch.y, pred)}")
+
+    # Compute attribute importance
+    attribute_importance = {
+        'vertical': compute_attribute_importance(val_batch.a, pred, val_batch.y),
+        'horizontal': compute_attribute_importance(1 - val_batch.a, pred, val_batch.y),
+        'prosaccade': compute_attribute_importance(val_batch.s, pred, val_batch.y),
+        'antisaccade': compute_attribute_importance(1 - val_batch.s, pred, val_batch.y),
+    }
+
+    print(attribute_importance)
+
+
+def compute_attribute_importance(attribute, pred, labels):
+    return f1_score(labels, pred, average='macro', sample_weight=attribute) - \
+           f1_score(labels, pred, average='macro')
 
 
 if __name__ == '__main__':
