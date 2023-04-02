@@ -6,6 +6,8 @@ from torch.nn.functional import relu, normalize
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import SequentialLR, CosineAnnealingLR, LinearLR
 
+from utils.misc import initialize_weights
+
 
 class InceptionModule(nn.Module):
     NUM_FILTER_SETS = 3
@@ -76,16 +78,15 @@ class LitInceptionTime(LightningModule):
         self.normalize_output = normalize_output
 
         # The outputs from the filter sets will be concatenated feature-wise along with the parallel low pass filter.
-        intermediate_out_dim = (InceptionModule.NUM_FILTER_SETS + 1) * hidden_dim
-        self.inception_modules = nn.Sequential(*[InceptionModule(in_dim=in_dim if i == 0 else intermediate_out_dim,
+        self.out_dim = (InceptionModule.NUM_FILTER_SETS + 1) * hidden_dim
+        self.inception_modules = nn.Sequential(*[InceptionModule(in_dim=in_dim if i == 0 else self.out_dim,
                                                                  hidden_dim=hidden_dim,
                                                                  bottleneck_dim=bottleneck_dim,
                                                                  base_kernel_size=base_kernel_size,
                                                                  residual=use_residuals) for i in range(depth)])
-        # self.linear = Linear()
         self.loss_fn = TripletMarginLoss(margin=triplet_margin, p=2, swap=anchor_swap)
 
-        self.apply(self.initialize_weights)
+        self.apply(initialize_weights)
         self.save_hyperparameters()
 
     def forward(self, x: Tensor) -> Tensor:
@@ -101,18 +102,10 @@ class LitInceptionTime(LightningModule):
         positive_out = self(positive.x)
         negative_out = self(negative.x)
 
+        # Validation is performed on the entire batch
         if step == 'train' and self.num_semi_hard_negatives is not None:
-            positive_dist = norm(anchor_out - positive_out, dim=-1)
-            negative_dist = norm(anchor_out - negative_out, dim=-1)
-            # Select the semi-hard negatives, i.e. the hardest negatives that are still further from the anchor than the
-            # positive. This is done in favour of naively choosing the hardest negatives, to avoid local minima.
-            negatives_order = argsort(negative_dist)
-            semi_hard_indices = negatives_order[negative_dist[negatives_order] > positive_dist[negatives_order]]
-
-            # Use the num_semi_hard_negatives hardest semi-hard triplets.
-            anchor_out = anchor_out[semi_hard_indices[:self.num_semi_hard_negatives]]
-            positive_out = positive_out[semi_hard_indices[:self.num_semi_hard_negatives]]
-            negative_out = negative_out[semi_hard_indices[:self.num_semi_hard_negatives]]
+            anchor_out, positive_out, negative_out = compute_semi_hard_negatives(anchor_out, positive_out, negative_out,
+                                                                                 self.num_semi_hard_negatives)
 
         loss = self.loss_fn(anchor_out, positive_out, negative_out)
         self.log(f'{step}_loss', loss, on_epoch=True, prog_bar=True)
@@ -139,15 +132,18 @@ class LitInceptionTime(LightningModule):
 
         return [optimizer], [lr_scheduler]
 
-    @staticmethod
-    def initialize_weights(m):
-        if isinstance(m, nn.Conv1d):
-            nn.init.kaiming_uniform_(m.weight.data, nonlinearity='relu')
-            if m.bias is not None:
-                nn.init.constant_(m.bias.data, 0)
-        elif isinstance(m, nn.BatchNorm1d):
-            nn.init.constant_(m.weight.data, 1)
-            nn.init.constant_(m.bias.data, 0)
-        elif isinstance(m, nn.Linear):
-            nn.init.kaiming_uniform_(m.weight.data)
-            nn.init.constant_(m.bias.data, 0)
+
+def compute_semi_hard_negatives(anchor_embeddings, positive_embeddings, negative_embeddings, num_semi_hard_negatives):
+    positive_dist = norm(anchor_embeddings - positive_embeddings, dim=-1)
+    negative_dist = norm(anchor_embeddings - negative_embeddings, dim=-1)
+    # Select the semi-hard negatives, i.e. the hardest negatives that are still further from the anchor than the
+    # positive. This is done in favour of naively choosing the hardest negatives, to avoid local minima.
+    negatives_order = argsort(negative_dist)
+    semi_hard_indices = negatives_order[negative_dist[negatives_order] > positive_dist[negatives_order]]
+
+    # Use the num_semi_hard_negatives hardest semi-hard triplets.
+    anchor_embeddings = anchor_embeddings[semi_hard_indices[:num_semi_hard_negatives]]
+    positive_embeddings = positive_embeddings[semi_hard_indices[:num_semi_hard_negatives]]
+    negative_embeddings = negative_embeddings[semi_hard_indices[:num_semi_hard_negatives]]
+
+    return anchor_embeddings, positive_embeddings, negative_embeddings
