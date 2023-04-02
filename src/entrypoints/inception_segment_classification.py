@@ -60,7 +60,7 @@ def main():
     forest_clf = RandomForestClassifier(
         n_jobs=1,
         n_estimators=200,
-        max_samples=0.82,
+        max_samples=0.6,
         max_depth=2
     )
     svm_clf = SVC(
