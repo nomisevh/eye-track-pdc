@@ -1,9 +1,10 @@
 """
 This file hosts our data preprocessing pipeline including sanitation, normalization, segmentation.
 """
-from typing import List
+from typing import List, Tuple
 
 import numpy as np
+from numpy import logical_and, ndarray, array
 from pandas import DataFrame
 from torch import inf
 from tqdm import tqdm
@@ -25,7 +26,7 @@ class Leif(MainProcessor):
                                     **config['segmentation'])
         self.channels = config['channels']
 
-    def __call__(self, frames: List[DataFrame], train=True) -> List[List[DataFrame]]:
+    def __call__(self, frames: List[DataFrame], train=True) -> Tuple[List[List[DataFrame]], ndarray]:
         # Sanitize files
         if train:
             frames = self.sanitizer(frames)
@@ -59,7 +60,7 @@ class Leif(MainProcessor):
             for j, segment in enumerate(trial):
                 trials[i][j] = segment[-min_segment_length:]
 
-        return trials
+        return trials, self.sanitizer.mask
 
 
 class SaccadeAmplitudeNormalizer(BatchProcessor):
@@ -122,6 +123,7 @@ class FileFilter(BatchProcessor):
     def __init__(self, *, position_thresholds, drift_thresholds):
         self.position_thresholds = position_thresholds.values()
         self.drift_thresholds = drift_thresholds.values()
+        self.mask = None
 
     def __call__(self, frames: List[DataFrame], **kwargs) -> List[DataFrame]:
         """
@@ -131,6 +133,7 @@ class FileFilter(BatchProcessor):
         :param frames: A list holding the dataframes to be filtered
         """
         iterator = zip(FileFilter.SERIES_HEADERS, [self.position_thresholds, self.drift_thresholds])
+        keep = np.ones(len(frames), dtype=bool)
         for header, thresholds in iterator:
             series = [df[header] for df in frames]
             heuristics = {
@@ -139,11 +142,15 @@ class FileFilter(BatchProcessor):
             }
 
             for (h_name, h_values), threshold in zip(heuristics.items(), thresholds):
-                z_mask = ZScoreMask(threshold)
-                n_before = len(frames)
                 # Filter all remaining frames based on the z scores over the computed heuristic
-                frames = [frame for frame, outlier in zip(frames, z_mask(h_values)) if not outlier]
-                print(f'skipped {abs(len(frames) - n_before)} files ({header} {h_name} outlier)')
+                outlier = ZScoreMask(threshold)(h_values)
+                keep = logical_and(keep, ~outlier)
+                print(f'{outlier.sum()} files are {header} {h_name} outliers')
+
+        # Filter the frames
+        frames = array(frames, dtype=object)[keep]
+        self.mask = keep
+        print(f'skipped {(~keep).sum()} files in total')
 
         return frames
 

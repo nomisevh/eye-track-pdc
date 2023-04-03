@@ -1,20 +1,22 @@
 import abc
 from abc import ABC
-from typing import List
+from typing import List, Tuple
 
+from numpy import ndarray
 from pandas import DataFrame
 
 
 class MainProcessor(ABC):
 
     @abc.abstractmethod
-    def __call__(self, frames: List[DataFrame], **kwargs) -> List[List[DataFrame]]:
+    def __call__(self, frames: List[DataFrame], **kwargs) -> Tuple[List[List[DataFrame]], ndarray]:
         """
         Processes and segments a list of multivariate time series (MTS)
 
         :param frames: A list containing dataframes which hold the MTS
         :param kwargs: Any processor-specific arguments
-        :return: A list of lists holding all the processed and segmented MTS
+        :return: A list of lists holding all the processed and segmented MTS and a numpy array holding a mask signifying
+        which frames were kept during any sanitation.
         """
         raise NotImplementedError
 

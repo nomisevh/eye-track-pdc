@@ -103,3 +103,7 @@ class KIDataModule(LightningDataModule):
 
     def class_names(self):
         return ['HC', 'PD ON', 'PD OFF'] if not self.binary_classification else ['HC', 'PD']
+
+    @staticmethod
+    def group_names():
+        return ['HC', 'PD ON', 'PD OFF']
