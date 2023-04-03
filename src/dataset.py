@@ -20,11 +20,12 @@ from utils.ki import LABELS as KI_LABELS, FILENAME_REGEX as KI_FILENAME_REGEX, A
 from utils.misc import torch_unique_index
 from utils.path import ki_data_tmp_path, config_path
 
-Signature = namedtuple('Signature', ['x', 'y', 'z', 'r', 'a', 's'])
+Signature = namedtuple('Signature', ['x', 'y', 'z', 'r', 'a', 's', 'g'])
 
 
 class KIDataset(Dataset):
-    SINGULAR_ATTRIBUTES = ['y', 'z', 'r', 'a', 's']
+    # All the attributes that have a single value per data point
+    SINGULAR_ATTRIBUTES = [attr for attr in Signature._fields if attr != 'x']
 
     def __init__(self, *, data_processor: MainProcessor, train: bool, bundle_as_experiments=False, use_triplets=False,
                  exclude=None, sources=('HC', 'PD_OFF', 'PD_ON')):
@@ -42,13 +43,13 @@ class KIDataset(Dataset):
             segmented_files = data_processor(dataframes, train=train)
 
             if bundle_as_experiments:
-                x, y, z, r, a, s = populate_ki_experiments(segmented_files, filenames)
+                x, y, z, r, a, s, g = populate_ki_experiments(segmented_files, filenames)
                 # Tensor with shape (N, L, M, T) holding the multivariate time series.
                 # N is number of data points, L is the number of segments in each experiment, M is the dimensionality and
                 # T is the length of the series.
                 self.x = tensor(array(x)).float().permute(0, 1, 3, 2)
             else:
-                x, y, z, r, a, s = populate_ki_segments(segmented_files, filenames)
+                x, y, z, r, a, s, g = populate_ki_segments(segmented_files, filenames)
                 # Tensor with shape (N, M, T) holding the multivariate time series.
                 # N is number of data points, M is the dimensionality and T is the length of the series.
                 self.x = tensor(array(x)).float().permute(0, 2, 1)
@@ -63,6 +64,9 @@ class KIDataset(Dataset):
             self.a = tensor(a, dtype=torch_int)
             # Tensor with shape (N) holding the saccade type of each segment (0:'pro', 1:'anti')
             self.s = tensor(s, dtype=torch_int)
+            # Tensor with shape (N) holding the group each segment belongs to (0:'HC', 1:'PDOFF', 2:'PDON')
+            # Similar to y but is not affected by binarization.
+            self.g = tensor(g, dtype=torch_int)
 
             # Cache data for faster future loading
             self.save(file_path)
@@ -168,6 +172,7 @@ def populate_ki_segments(segmented_files, filenames):
                 r=trial,
                 a=KI_AXIS[axis],
                 s=KI_SACCADE[saccade],
+                g=KI_LABELS[group],
             ))
     return zip(*datapoints)
 
@@ -183,6 +188,7 @@ def populate_ki_experiments(segmented_files, filenames):
             r=experiment,
             a=KI_AXIS[axis],
             s=KI_SACCADE[saccade],
+            g=KI_LABELS[group],
         ))
     return zip(*datapoints)
 
