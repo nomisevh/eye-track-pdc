@@ -24,6 +24,8 @@ Signature = namedtuple('Signature', ['x', 'y', 'z', 'r', 'a', 's'])
 
 
 class KIDataset(Dataset):
+    SINGULAR_ATTRIBUTES = ['y', 'z', 'r', 'a', 's']
+
     def __init__(self, *, data_processor: MainProcessor, train: bool, bundle_as_experiments=False, use_triplets=False,
                  exclude=None, sources=('HC', 'PD_OFF', 'PD_ON')):
         self.use_triplets = use_triplets
@@ -71,23 +73,25 @@ class KIDataset(Dataset):
             self.exclude_data(exclude)
 
     def __getitem__(self, item):
-        anchor = Signature(self.x[item], self.y[item], self.z[item], self.r[item], self.a[item], self.s[item])
+        anchor = self._get(item)
         if not self.use_triplets:
             return anchor
 
         # Compute the indices of all items that have the same label but are from a different individual than the anchor
         positive_indices = argwhere(logical_and(self.y == anchor.y, self.z != anchor.z))  # noqa
         positive_item = random.choice(positive_indices).item()
-        positive = Signature(self.x[positive_item], self.y[positive_item], self.z[positive_item],
-                             self.r[positive_item], self.a[positive_item], self.s[positive_item])
+        positive = self._get(positive_item)
 
         # Compute the indices of all items that do not belong to the same patient as the anchor
         negative_indices = argwhere(self.y != anchor.y)  # noqa
         negative_item = random.choice(negative_indices).item()
-        negative = Signature(self.x[negative_item], self.y[negative_item], self.z[negative_item],
-                             self.r[negative_item], self.a[negative_item], self.s[negative_item])
+        negative = self._get(negative_item)
 
         return anchor, positive, negative
+
+    def _get(self, item):
+        # Return a named tuple with the requested data point
+        return Signature(self.x[item], *[getattr(self, attr)[item] for attr in self.SINGULAR_ATTRIBUTES])
 
     def __len__(self):
         return len(self.y)
@@ -95,7 +99,7 @@ class KIDataset(Dataset):
     def save(self, save_path):
         if not exists(save_path.parent):
             makedirs(save_path.parent)
-        save({'x': self.x, 'y': self.y, 'z': self.z, 'r': self.r, 'a': self.a, 's': self.s}, save_path)
+        save({'x': self.x, **{attr: getattr(self, attr) for attr in self.SINGULAR_ATTRIBUTES}}, save_path)
 
     def clone(self, index):
         clone = KIDataset.__new__(KIDataset)
@@ -128,8 +132,8 @@ class KIDataset(Dataset):
         original_shape = self.x.shape
         self.x = self.x.view(-1, self.x.shape[-2], self.x.shape[-1])
 
-        # Expand y, z, r, a and s to match the new shape of x
-        for attr in ['y', 'z', 'r', 'a', 's']:
+        # Expand singular attributes to match the new shape of x
+        for attr in self.SINGULAR_ATTRIBUTES:
             setattr(self, attr, getattr(self, attr).repeat_interleave(original_shape[1], dim=0))
 
     # Batches the segments into experiments according to the r attribute.
@@ -143,7 +147,7 @@ class KIDataset(Dataset):
         # Sort the segments by experiment, batch them, and stack them into a tensor
         self.x = stack(self.x[sorting_indices].split(batch_sizes.tolist()))
         # Only keep one entry per experiment for the other attributes
-        for attr in ['y', 'z', 'r', 'a', 's']:
+        for attr in self.SINGULAR_ATTRIBUTES:
             entries_per_experiment = getattr(self, attr)[sorting_indices].split(batch_sizes.tolist())
             setattr(self, attr, stack([entries[0] for entries in entries_per_experiment]))
 
@@ -233,6 +237,9 @@ def test():
     ax.legend(ncol=2)
     plt.show()
     fig.savefig('samples.png')
+
+    ds.batch()
+    ds.flatten()
 
 
 if __name__ == '__main__':
