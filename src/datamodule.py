@@ -102,8 +102,8 @@ class KIDataModule(LightningDataModule):
             self.test_ds.batch()
 
     def class_names(self):
-        return ['HC', 'PD ON', 'PD OFF'] if not self.binary_classification else ['HC', 'PD']
+        return ['HC', 'PD OFF', 'PD ON'] if not self.binary_classification else ['HC', 'PD']
 
     @staticmethod
     def group_names():
-        return ['HC', 'PD ON', 'PD OFF']
+        return ['HC', 'PD OFF', 'PD ON']
