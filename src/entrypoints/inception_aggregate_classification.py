@@ -1,10 +1,13 @@
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import NeptuneLogger
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import f1_score
 from yaml import load as load_yaml, FullLoader
 
 from datamodule import KIDataModule
-from models.inceptiontime import LitInceptionTime, LitAggregateClassifier
+from models.classifier import LitAggregateClassifier
+from models.inceptiontime import LitInceptionTime
 from utils.const import SEED
 from utils.misc import set_random_state
 from utils.path import config_path, log_path, checkpoint_path
@@ -35,7 +38,7 @@ def main():
 
     checkpoint_callback = ModelCheckpoint(dirpath=checkpoint_path, monitor='val_loss', every_n_epochs=1)
     trainer = Trainer(accelerator='auto',
-                      max_epochs=100,
+                      max_epochs=500,
                       default_root_dir=log_path,
                       log_every_n_steps=1,
                       logger=NeptuneLogger(log_model_checkpoints=False, **neptune_config),
@@ -50,7 +53,7 @@ def main():
                       logger=NeptuneLogger(log_model_checkpoints=False, **neptune_config),
                       callbacks=[checkpoint_callback])
     # model = LitInceptionTime.load_from_checkpoint(checkpoint_callback.best_model_path)
-    model = LitInceptionTime.load_from_checkpoint(checkpoint_path.joinpath('epoch=49-step=200-v3.ckpt'))
+    model = LitInceptionTime.load_from_checkpoint(checkpoint_path.joinpath('epoch=426-step=2135.ckpt'))
 
     # Batch the segments by experiment before training the aggregate classifier.
     dm.batch()
