@@ -17,7 +17,7 @@ class LitLinearClassifier(LightningModule):
         self.feature_extractor = feature_extractor
         self.feature_extractor.freeze()
         # self.classifier = nn.Linear(feature_dim, num_classes)
-        self.hidden_dim = 32
+        self.hidden_dim = 64
         self.classifier = nn.Sequential(*[nn.Linear(feature_dim, self.hidden_dim),
                                           nn.Dropout(),
                                           nn.ReLU(),
@@ -73,6 +73,11 @@ class LitLinearClassifier(LightningModule):
         )
 
         # Return the predictions for plotting confusion matrix
+        return probs.round()
+
+    def predict_step(self, batch, batch_idx, dataloader_idx: int = 0):
+        logits = self(batch.x).squeeze()
+        probs = nn.functional.sigmoid(logits)
         return probs.round()
 
     def configure_optimizers(self):
