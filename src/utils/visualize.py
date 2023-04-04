@@ -2,6 +2,8 @@ import numpy as np
 import torch
 from matplotlib import colors as m_colors
 from matplotlib import pyplot as plt
+from numpy import median
+from scipy.stats import median_absolute_deviation
 from torch import Tensor
 
 from utils.data import normalize
@@ -68,4 +70,16 @@ def plot_top_eigenvalues(test_features, n=100):
     ax.set_title(f'Top {n} eigenvalues for ROCKET Embeddings')
     ax.legend(loc='lower right')
     ax2.legend(loc='center right')
+    plt.show()
+
+
+def histogram_heuristic(h_values, h_name, threshold=3.0, channels=''):
+    med = median(h_values)
+    mad = median_absolute_deviation(h_values)
+    # Plot a histogram of the heuristic values with vertical lines for the median and threshold * MAD
+    plt.hist(h_values, bins=100)
+    plt.axvline(med, color='r')
+    plt.axvline(med + threshold * mad, color='g')
+    plt.axvline(med - threshold * mad, color='g')
+    plt.title(f'{channels} {h_name} histogram')
     plt.show()
