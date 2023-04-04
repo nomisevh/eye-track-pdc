@@ -1,10 +1,12 @@
 from numpy import argsort
 from pytorch_lightning import LightningModule
-from torch import nn, Tensor, concatenate, norm
-from torch.nn import ModuleList, TripletMarginLoss
+from torch import nn, Tensor, concatenate, norm, sigmoid
+from torch.nn import ModuleList, TripletMarginLoss, BCEWithLogitsLoss
 from torch.nn.functional import relu, normalize
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import SequentialLR, CosineAnnealingLR, LinearLR
+from torchmetrics.functional import f1_score
+from torchmetrics.functional.classification import binary_accuracy
 
 from utils.misc import initialize_weights
 
@@ -147,3 +149,105 @@ def compute_semi_hard_negatives(anchor_embeddings, positive_embeddings, negative
     negative_embeddings = negative_embeddings[semi_hard_indices[:num_semi_hard_negatives]]
 
     return anchor_embeddings, positive_embeddings, negative_embeddings
+
+
+class EndToEndInceptionTimeClassifier(LightningModule):
+
+    def __init__(self, lr: float = 1e-4, wd: float = 1e-3, num_classes: int = 1, **kwargs):
+        super().__init__()
+        self.lr = lr
+        self.wd = wd
+        self.inception_time = LitInceptionTime(**kwargs)
+        self.hidden_dim = 64
+        self.classifier = nn.Sequential(*[nn.Linear(self.inception_time.out_dim, self.hidden_dim),
+                                          nn.Dropout(),
+                                          nn.ReLU(),
+                                          nn.Linear(self.hidden_dim, self.hidden_dim),
+                                          nn.Dropout(),
+                                          nn.ReLU(),
+                                          nn.Linear(self.hidden_dim, self.hidden_dim),
+                                          nn.Dropout(),
+                                          nn.ReLU(),
+                                          nn.Linear(self.hidden_dim, num_classes),
+                                          ])
+
+        self.triplet_loss_fn = self.inception_time.loss_fn
+        self.clf_loss = BCEWithLogitsLoss()
+
+        self.apply(initialize_weights)
+        self.save_hyperparameters()
+
+    def forward(self, x: Tensor) -> (Tensor, Tensor):
+        features = self.inception_time.forward(x)
+        logits = self.classifier(features)
+        return features, logits.squeeze()
+
+    def shared_step(self, batch, batch_idx, step):
+        anchor, positive, negative = batch
+
+        anchor_out, anchor_logits = self(anchor.x)
+        positive_out, positive_logits = self(positive.x)
+        negative_out, negative_logits = self(negative.x)
+
+        if step == 'train' and self.inception_time.num_semi_hard_negatives is not None:
+            anchor_out, positive_out, negative_out = \
+                compute_semi_hard_negatives(anchor_out, positive_out, negative_out,
+                                            self.inception_time.num_semi_hard_negatives)
+
+        triplet_loss = self.inception_time.loss_fn(anchor_out, positive_out, negative_out)
+        bce_losses = [self.clf_loss(pred, item.y) for item, pred in
+                      zip(batch, [anchor_logits, positive_logits, negative_logits])]
+        # Uniform weighting of losses (incl. triplet loss)
+        total_loss = sum([triplet_loss] + bce_losses) / 4
+
+        anchor_probs = sigmoid(anchor_logits)
+
+        self.log_dict({
+            # The combined loss
+            f'{step}_loss': total_loss,
+            # The triplet loss
+            f'{step}_triplet_loss': triplet_loss,
+            # The individual BCE losses for the anchor, positive, and negative respectively
+            **{f'{step}_{item}_bce_loss': loss for item, loss in zip(['anchor', 'pos', 'neg'], bce_losses)},
+            # The accuracy for the anchor predictions
+            f'{step}_accuracy': binary_accuracy(anchor_probs, anchor.y),
+            # The F1 score for the anchor predictions
+            f'{step}_f1': f1_score(anchor_probs, anchor.y, task='binary', average='macro')},
+            on_epoch=True)
+
+        return total_loss
+
+    def training_step(self, *args):
+        return self.shared_step(*args, step='train')
+
+    def validation_step(self, *args):
+        return self.shared_step(*args, step='val')
+
+    def test_step(self, batch, batch_idx):
+        _, logits = self(batch.x)
+
+        probs = sigmoid(logits.squeeze())
+
+        self.log_dict({
+            # The accuracy for the anchor predictions
+            f'test_accuracy': binary_accuracy(probs, batch.y),
+            # The F1 score for the anchor predictions
+            f'test_f1': f1_score(probs, batch.y, task='binary', average='macro')},
+        )
+
+    def predict_step(self, batch, batch_idx, dataloader_idx=None):
+        _, logits = self(batch.x)
+        probs = nn.functional.sigmoid(logits.squeeze())
+        return probs.round()
+
+    def configure_optimizers(self):
+        optimizer = AdamW(self.parameters(), lr=self.lr, weight_decay=self.wd)
+
+        warmup_epochs = self.trainer.max_epochs // 20
+        # Cosine annealing with warmup, to allow use of learning rate scaling rule, see Goyal et al. 2018
+        lr_scheduler = SequentialLR(optimizer, [
+            LinearLR(optimizer, total_iters=warmup_epochs),
+            CosineAnnealingLR(optimizer, T_max=self.trainer.max_epochs - warmup_epochs)
+        ], milestones=[warmup_epochs])
+
+        return [optimizer], [lr_scheduler]
