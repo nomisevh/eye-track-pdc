@@ -127,6 +127,12 @@ class KIDataset(Dataset):
         if 'pro' in exclude:
             exclude_items = logical_or(exclude_items, self.s == KI_SACCADE['pro'])
 
+        if 'anti' in exclude:
+            exclude_items = logical_or(exclude_items, self.s == KI_SACCADE['anti'])
+
+        if 'vert' in exclude:
+            exclude_items = logical_or(exclude_items, self.a == KI_AXIS['vert'])
+
         # For every attribute that is tensor, only keep the inverse of the excluded items
         for attr, value in self.__dict__.items():
             if isinstance(value, Tensor):
