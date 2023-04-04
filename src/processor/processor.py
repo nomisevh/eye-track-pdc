@@ -26,10 +26,9 @@ class Leif(MainProcessor):
                                     **config['segmentation'])
         self.channels = config['channels']
 
-    def __call__(self, frames: List[DataFrame], train=True) -> Tuple[List[List[DataFrame]], ndarray]:
+    def __call__(self, frames: List[DataFrame], **kwargs) -> Tuple[List[List[DataFrame]], ndarray]:
         # Sanitize files
-        if train:
-            frames = self.sanitizer(frames)
+        frames = self.sanitizer(frames)
 
         # Normalize files
         frames = self.file_normalizer(frames)

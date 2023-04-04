@@ -40,7 +40,7 @@ class KIDataset(Dataset):
         else:
             dataframes, filenames = load_data(train, sources)
 
-            segmented_files, kept = data_processor(dataframes, train=train)
+            segmented_files, kept = data_processor(dataframes)
             # Only keep the filenames of the files that were not filtered out
             filenames = array(filenames)[kept]
 
