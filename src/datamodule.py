@@ -51,7 +51,10 @@ class KIDataModule(LightningDataModule):
                                           bundle_as_experiments=self.bundle_as_experiments,
                                           use_triplets=self.use_triplets,
                                           exclude=self.exclude)
-            self.train_ds, self.val_ds = train_test_split_stratified(self.train_val_ds, test_size=self.val_size)
+            if self.val_size != 0:
+                self.train_ds, self.val_ds = train_test_split_stratified(self.train_val_ds, test_size=self.val_size)
+            else:
+                self.train_ds = self.train_val_ds
 
         # Assign test dataset for use in dataloader
         if stage == "test":
@@ -80,6 +83,9 @@ class KIDataModule(LightningDataModule):
     def test_dataloader(self):
         return DataLoader(self.test_ds, batch_size=len(self.test_ds) if self.batch_size == -1 else self.batch_size,
                           num_workers=self.num_workers)
+
+    def predict_dataloader(self):
+        return self.test_dataloader()
 
     def set_use_triplets(self, value: bool):
         self.train_ds.use_triplets = value
