@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod
 from typing import Sequence, Tuple, Any
 
 import numpy as np
+from numpy import array
+from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
 from torch import cat, Tensor
 from torch.utils.data import Dataset
@@ -112,3 +114,20 @@ def grid_search_2d(validator: Validator, callback: Validator.Callback, dataset: 
     np.savetxt('grid_search_result_std.csv', deviations, delimiter=',')  # noqa
 
     return scores
+
+
+def get_attribute_power(batch, pred):
+    return {
+        'vertical': compute_attribute_power(batch.a, pred, batch.y),
+        'horizontal': compute_attribute_power(1 - batch.a, pred, batch.y),
+        'prosaccade': compute_attribute_power(1 - batch.s, pred, batch.y),
+        'antisaccade': compute_attribute_power(batch.s, pred, batch.y),
+        'horizontal antisaccade': compute_attribute_power(batch.s * (1 - batch.a), pred, batch.y),
+        'dopamine': compute_attribute_power(array(batch.g != 1, dtype=int), pred, batch.y),
+        'non-dopamine': compute_attribute_power(array(batch.g != 2, dtype=int), pred, batch.y),
+    }
+
+
+def compute_attribute_power(attribute, pred, labels):
+    return f1_score(labels, pred, average='macro', sample_weight=attribute) - \
+           f1_score(labels, pred, average='macro')
