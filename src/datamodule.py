@@ -22,7 +22,7 @@ class KIDataModule(LightningDataModule):
         :param batch_size: the size of mini-batches, if -1 then equal to the length of the dataset
         """
         super().__init__()
-        self.train_ds, self.val_ds, self.test_ds, self.train_val_ds = None, None, None, None
+        self.train_ds, self.val_ds, self.test_ds = None, None, None
         if train_ds is not None:
             self.train_ds = train_ds
             self.train_ds.use_triplets = use_triplets
@@ -42,21 +42,21 @@ class KIDataModule(LightningDataModule):
         if processor_config is not None:
             self.processor = Leif(processor_config)
 
-        self.save_hyperparameters(ignore=['train_ds', 'test_ds', 'train_val_ds', 'val_ds'])
+        self.save_hyperparameters(ignore=['train_ds', 'val_ds', 'test_ds'])
 
     def setup(self, stage: str):
         # Assign train/val datasets for use in dataloaders
         if stage == "fit" and self.train_ds is None:
-            self.train_val_ds = KIDataset(data_processor=self.processor,
-                                          train=True,
-                                          bundle_as_experiments=self.bundle_as_experiments,
-                                          use_triplets=self.use_triplets,
-                                          exclude=self.exclude,
-                                          sources=self.sources)
+            train_val_ds = KIDataset(data_processor=self.processor,
+                                     train=True,
+                                     bundle_as_experiments=self.bundle_as_experiments,
+                                     use_triplets=self.use_triplets,
+                                     exclude=self.exclude,
+                                     sources=self.sources)
             if self.val_size != 0:
-                self.train_ds, self.val_ds = train_test_split_stratified(self.train_val_ds, test_size=self.val_size)
+                self.train_ds, self.val_ds = train_test_split_stratified(train_val_ds, test_size=self.val_size)
             else:
-                self.train_ds = self.train_val_ds
+                self.train_ds = train_val_ds
 
         # Assign test dataset for use in dataloader
         if stage == "test":
@@ -80,6 +80,8 @@ class KIDataModule(LightningDataModule):
                           num_workers=self.num_workers)
 
     def val_dataloader(self):
+        if self.val_ds is None:
+            return None
         return DataLoader(self.val_ds, batch_size=len(self.val_ds) if self.batch_size == -1 else self.batch_size,
                           num_workers=self.num_workers)
 
@@ -92,13 +94,13 @@ class KIDataModule(LightningDataModule):
 
     def set_use_triplets(self, value: bool):
         self.train_ds.use_triplets = value
-        self.val_ds.use_triplets = value
+        if self.val_ds is not None:
+            self.val_ds.use_triplets = value
 
     # Flattens the datasets, i.e. removes the experiment dimension
     def flatten(self):
         self.train_ds.flatten()
         self.val_ds.flatten()
-        self.train_val_ds.flatten()
         if self.test_ds is not None:
             self.test_ds.flatten()
 
@@ -106,7 +108,6 @@ class KIDataModule(LightningDataModule):
     def batch(self):
         self.train_ds.batch()
         self.val_ds.batch()
-        self.train_val_ds.batch()
         if self.test_ds is not None:
             self.test_ds.batch()
 
