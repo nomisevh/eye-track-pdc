@@ -129,5 +129,4 @@ def get_attribute_power(batch, pred):
 
 
 def compute_attribute_power(attribute, pred, labels):
-    return f1_score(labels, pred, average='macro', sample_weight=attribute) - \
-           f1_score(labels, pred, average='macro')
+    return f1_score(labels, pred, average='macro', sample_weight=attribute) - f1_score(labels, pred, average='macro')

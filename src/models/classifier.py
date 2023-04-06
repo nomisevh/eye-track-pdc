@@ -15,7 +15,6 @@ class LitLinearClassifier(LightningModule):
         super().__init__()
 
         self.feature_extractor = feature_extractor
-        self.feature_extractor.freeze()
         # self.classifier = nn.Linear(feature_dim, num_classes)
         self.hidden_dim = 64
         self.classifier = nn.Sequential(*[nn.Linear(feature_dim, self.hidden_dim),
@@ -62,7 +61,7 @@ class LitLinearClassifier(LightningModule):
         return self.shared_step(*args, step='val')
 
     def test_step(self, batch, batch_idx):
-        _, logits = self(batch)
+        logits = self(batch.x)
         probs = nn.functional.sigmoid(logits)
 
         self.log_dict({
