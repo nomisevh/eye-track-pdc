@@ -3,6 +3,7 @@ import torch
 from matplotlib import colors as m_colors
 from matplotlib import pyplot as plt
 from numpy import median
+from pandas import DataFrame
 from scipy.stats import median_absolute_deviation
 from torch import Tensor
 
@@ -83,4 +84,22 @@ def histogram_heuristic(h_values, h_name, threshold=3.0, channels=''):
     plt.axvline(med + threshold * mad, color='g')
     plt.axvline(med - threshold * mad, color='g')
     plt.title(f'{channels} {h_name} histogram')
+    plt.show()
+
+
+def plot_inter_saccade(dataframe: DataFrame):
+    target_diff = dataframe['target'].diff().fillna(0)
+    # The start and end of each saccade is marked by a change in the target position
+    anchors = [*dataframe['target'][target_diff != 0].index.tolist()]
+    to_plot = dataframe.iloc[anchors[0]:anchors[3]]
+    fig, ax = plt.subplots(figsize=(7, 5), dpi=300)
+    ax.plot(to_plot['Time (ms)'], to_plot['position'], label='gaze x')
+    ax.plot(to_plot['Time (ms)'], to_plot['drift'], label='gaze y')
+    ax.plot(to_plot['Time (ms)'], to_plot['target'], label='target x')
+    # Highlight from 1000 ms after anchor 1 to anchor 2
+    ax.axvspan(dataframe['Time (ms)'][anchors[1]] + 1000, dataframe['Time (ms)'][anchors[2]], alpha=0.2, color='black')
+    ax.set_title('Focused Gaze - Waiting for Target Movement')
+    ax.set_xlabel('Time (ms)')
+    ax.set_ylabel('Normalized Gaze Position')
+    ax.legend(loc='lower right')
     plt.show()
