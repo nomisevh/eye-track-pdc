@@ -7,7 +7,9 @@
 
 ### Import Statements
 
-* Use explicit import statements whenever possible e.g. `from torch.utils.data import Dataset`
+* Use explicit import statements e.g. `from torch.utils.data import Dataset`
+    * Exceptions are short and common import statements like `numpy as np`, `torch`, `pandas as pd`,
+      `matplotlib.pyplot as plt`, etc.
 * Always optimize statements before pushing
     * In pycharm this can be mapped to ctrl+s at `File | Settings | Tools | Actions on Save`
 
