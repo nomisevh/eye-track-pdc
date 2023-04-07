@@ -21,7 +21,14 @@ class Leif(MainProcessor):
 
     def __init__(self, config: dict):
         self.sanitizer = FileFilter(**config['sanitation'])
-        self.file_normalizer = SaccadeAmplitudeNormalizer(**config['file_normalization'])
+        normalization_method = config['file_normalization'].pop('which')
+        if normalization_method == 'saccade_amplitude':
+            self.file_normalizer = SaccadeAmplitudeNormalizer(**config['file_normalization'])
+        elif normalization_method == 'target':
+            self.file_normalizer = TargetBasedNormalizer(**config['file_normalization'])
+        else:
+            raise NotImplementedError(f'Normalization method {normalization_method} not implemented.')
+
         self.scissor = FocusScissor(sample_rate=SAMPLE_RATE, invisible_target_duration=INVISIBLE_TARGET_DURATION,
                                     **config['segmentation'])
         self.channels = config['channels']
@@ -72,7 +79,7 @@ class SaccadeAmplitudeNormalizer(BatchProcessor):
         """
         :param trailing_window_width: The width of the trailing window over which the median values are computed.
         :param scaling_factor: The factor by which we scale the saccade amplitude before normalizing.
-            0.1 gives a good range of values for KI dataset.
+            10 gives a good range of values for KI dataset.
         """
         self.n = trailing_window_width
         self.scaling_factor = scaling_factor
@@ -111,6 +118,27 @@ class SaccadeAmplitudeNormalizer(BatchProcessor):
         if skipped > 0:
             print(f"skipped {skipped} files (no target movement)")
         return normalized_frames
+
+
+class TargetBasedNormalizer(BatchProcessor):
+    """
+    Normalizes files based on the absolute maximum value of the target channel.
+    """
+    NORMALIZE_CHANNELS = ["position", "drift", "target", "position_diff", "drift_diff"]
+
+    def __init__(self, *, scaling_factor=10):
+        """
+        :param scaling_factor: The factor by which we scale the saccade amplitude before normalizing.
+            10 gives a good range of values for KI dataset.
+        """
+        self.scaling_factor = scaling_factor
+
+    def __call__(self, frames: List[DataFrame], **kwargs) -> List[DataFrame]:
+        # TODO I hope it works to do this in place
+        for df in frames:
+            df[self.NORMALIZE_CHANNELS] /= df["target"].abs().max()
+            df[self.NORMALIZE_CHANNELS] *= self.scaling_factor
+        return frames
 
 
 class FileFilter(BatchProcessor):
