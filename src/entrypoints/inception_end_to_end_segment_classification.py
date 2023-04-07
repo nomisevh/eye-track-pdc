@@ -34,7 +34,8 @@ def main():
                       exclude=['vert'],
                       binary_classification=True,
                       batch_size=256,
-                      val_size=0.2)
+                      val_size=0.2,
+                      ips=True)
     dm.setup('fit')
     dm.setup('test')
 

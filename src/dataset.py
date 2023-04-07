@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 from numpy import array
 from sklearn.model_selection import train_test_split
 from torch import tensor, int as torch_int, bool as torch_bool, save, load, isin, logical_not, argwhere, \
-    logical_and, Tensor, zeros, logical_or, argsort, bincount, stack
+    Tensor, zeros, logical_or, argsort, bincount, stack
 from torch.utils.data import Dataset
 from yaml import load as load_yaml, FullLoader
 
@@ -28,8 +28,9 @@ class KIDataset(Dataset):
     SINGULAR_ATTRIBUTES = [attr for attr in Signature._fields if attr != 'x']
 
     def __init__(self, *, data_processor: MainProcessor, train: bool, bundle_as_experiments=False, use_triplets=False,
-                 exclude=None, sources=('HC', 'PD_OFF', 'PD_ON')):
+                 exclude=None, sources=('HC', 'PD_OFF', 'PD_ON'), ips: bool = False):
         self.use_triplets = use_triplets
+        self.ips = ips
 
         file_path = ki_data_tmp_path.joinpath(self.format_filename(train, bundle_as_experiments, sources))
 
@@ -83,12 +84,18 @@ class KIDataset(Dataset):
         if not self.use_triplets:
             return anchor
 
-        # Compute the indices of all items that have the same label but are from a different individual than the anchor
-        positive_indices = argwhere(logical_and(self.y == anchor.y, self.z != anchor.z))  # noqa
+        if self.ips:
+            # Compute the indices of all items that have the same label but are from a different individual than the
+            # anchor
+            positive_indices = argwhere(logical_and(self.y == anchor.y, self.z != anchor.z))  # noqa
+        else:
+            # Compute the indices of all items that have the same label as the anchor
+            positive_indices = argwhere(self.y == anchor.y)  # noqa
+
         positive_item = random.choice(positive_indices).item()
         positive = self._get(positive_item)
 
-        # Compute the indices of all items that do not belong to the same patient as the anchor
+        # Compute the indices of all items that have a different label than the anchor
         negative_indices = argwhere(self.y != anchor.y)  # noqa
         negative_item = random.choice(negative_indices).item()
         negative = self._get(negative_item)

@@ -10,7 +10,7 @@ from utils.data import binarize
 class KIDataModule(LightningDataModule):
     def __init__(self, train_ds=None, val_ds=None, processor_config=None, bundle_as_experiments=False,
                  use_triplets=False, exclude=None, val_size=0.2, binary_classification=False, batch_size=256,
-                 num_workers=0, sources=('HC', 'PD_OFF', 'PD_ON')):
+                 num_workers=0, sources=('HC', 'PD_OFF', 'PD_ON'), ips=False):
         """
         :param train_ds: optional prepared train dataset
         :param val_ds: optional prepared validation dataset
@@ -38,6 +38,7 @@ class KIDataModule(LightningDataModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.sources = sources
+        self.ips = ips
 
         if processor_config is not None:
             self.processor = Leif(processor_config)
@@ -52,7 +53,8 @@ class KIDataModule(LightningDataModule):
                                      bundle_as_experiments=self.bundle_as_experiments,
                                      use_triplets=self.use_triplets,
                                      exclude=self.exclude,
-                                     sources=self.sources)
+                                     sources=self.sources,
+                                     ips=self.ips)
             if self.val_size != 0:
                 self.train_ds, self.val_ds = train_test_split_stratified(train_val_ds, test_size=self.val_size)
             else:
