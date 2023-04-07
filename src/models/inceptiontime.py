@@ -154,7 +154,8 @@ def compute_semi_hard_negatives(anchor_embeddings, positive_embeddings, negative
 
 class EndToEndInceptionTimeClassifier(LightningModule):
 
-    def __init__(self, lr: float = 1e-4, wd: float = 1e-3, num_classes: int = 1, triplet_loss: bool = True, **kwargs):
+    def __init__(self, lr: float = 1e-4, wd: float = 1e-3, num_classes: int = 1, triplet_loss: bool = True,
+                 seed: int = None, **kwargs):
         super().__init__()
         self.lr = lr
         self.wd = wd

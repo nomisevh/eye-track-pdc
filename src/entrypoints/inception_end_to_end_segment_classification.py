@@ -17,6 +17,8 @@ from utils.misc import set_random_state
 from utils.path import config_path, log_path, checkpoint_path
 from utils.visualize import visualize_latent_space
 
+TAGS = ['Final Results', 'Triplet/IPS Ablation']
+
 
 def main():
     set_random_state(SEED)
@@ -39,15 +41,14 @@ def main():
     dm.setup('fit')
     dm.setup('test')
 
-    model = EndToEndInceptionTimeClassifier(num_classes=1, triplet_loss=True, **inception_config)
+    model = EndToEndInceptionTimeClassifier(num_classes=1, triplet_loss=True, seed=SEED, **inception_config)
 
-    checkpoint_callback = ModelCheckpoint(dirpath=checkpoint_path, monitor='val_uap', every_n_epochs=1, mode='max',
-                                          save_last=True)
+    checkpoint_callback = ModelCheckpoint(dirpath=checkpoint_path, monitor='val_uap', every_n_epochs=1, mode='max')
     trainer = Trainer(accelerator='auto',
                       max_epochs=500,
                       default_root_dir=log_path,
                       log_every_n_steps=1,
-                      logger=NeptuneLogger(log_model_checkpoints=False, **neptune_config),
+                      logger=NeptuneLogger(log_model_checkpoints=False, **neptune_config, tags=TAGS),
                       callbacks=[checkpoint_callback])
 
     # trainer.fit(model, datamodule=dm)
