@@ -1,3 +1,4 @@
+from neptune.utils import stringify_unsupported
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 from torchsampler import ImbalancedDatasetSampler
@@ -43,7 +44,9 @@ class KIDataModule(LightningDataModule):
         if processor_config is not None:
             self.processor = Leif(processor_config)
 
-        self.save_hyperparameters(ignore=['train_ds', 'val_ds', 'test_ds'])
+        self.stringified_processor_config = stringify_unsupported(processor_config)
+        self.save_hyperparameters(self.stringified_processor_config,
+                                  ignore=['train_ds', 'val_ds', 'test_ds', 'processor_config'])
 
     def setup(self, stage: str):
         # Assign train/val datasets for use in dataloaders
