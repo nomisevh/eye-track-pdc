@@ -248,7 +248,7 @@ class EndToEndInceptionTimeClassifier(LightningModule):
     def predict_step(self, batch, batch_idx, dataloader_idx=None):
         _, logits = self(batch.x)
         probs = nn.functional.sigmoid(logits.squeeze())
-        return probs.round()
+        return probs
 
     def configure_optimizers(self):
         optimizer = AdamW(self.parameters(), lr=self.lr, weight_decay=self.wd)
