@@ -12,7 +12,7 @@ from model_selection import get_attribute_power
 from models.inceptiontime import EndToEndInceptionTimeClassifier
 from utils.const import SEED
 from utils.ki import SACCADE, AXIS
-from utils.metric import patient_soft_accuracy
+from utils.metric import vote_aggregation
 from utils.misc import set_random_state
 from utils.path import config_path, log_path, checkpoint_path
 from utils.visualize import visualize_latent_space
@@ -92,14 +92,13 @@ def main():
     f1_scores = zeros(len(thresholds))
     accuracy_scores = zeros(len(thresholds))
     for i, threshold in enumerate(thresholds):
-        patient_pred, patient_label, patient_acc = patient_soft_accuracy(segment_scores=pred, y=val_batch.y,
-                                                                         z=val_batch.z, threshold=threshold)
-        f1_scores[i] = (f1_score(patient_label, patient_pred, average='macro'))
+        patient_pred, patient_label, _ = vote_aggregation(segment_scores=pred, labels=val_batch.y,
+                                                          aggregate_by=val_batch.z, threshold=threshold)
+        f1_scores[i] = f1_score(patient_label, patient_pred, average='macro')
         accuracy_scores[i] = accuracy_score(patient_label, patient_pred)
 
-    patient_pred, patient_label, patient_acc = patient_soft_accuracy(segment_scores=pred, y=val_batch.y,
-                                                                     z=val_batch.z,
-                                                                     threshold=thresholds[argmax(f1_scores)])
+    patient_pred, patient_label, patient_prob = vote_aggregation(segment_scores=pred, labels=val_batch.y,
+                                                                 aggregate_by=val_batch.z, threshold=0.5)
 
     plt.plot(thresholds, f1_scores)
     plt.show()
