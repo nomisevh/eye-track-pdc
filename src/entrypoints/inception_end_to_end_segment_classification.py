@@ -12,7 +12,7 @@ from model_selection import get_attribute_power
 from models.inceptiontime import EndToEndInceptionTimeClassifier
 from utils.const import SEED
 from utils.ki import SACCADE, AXIS
-from utils.metric import vote_aggregation
+from utils.metric import vote_aggregation, unweighted_binary_average_precision
 from utils.misc import set_random_state
 from utils.path import config_path, log_path, checkpoint_path
 from utils.visualize import visualize_latent_space
@@ -41,7 +41,8 @@ def main():
 
     model = EndToEndInceptionTimeClassifier(num_classes=1, triplet_loss=True, **inception_config)
 
-    checkpoint_callback = ModelCheckpoint(dirpath=checkpoint_path, monitor='val_f1', every_n_epochs=1, mode='max')
+    checkpoint_callback = ModelCheckpoint(dirpath=checkpoint_path, monitor='val_uap', every_n_epochs=1, mode='max',
+                                          save_last=True)
     trainer = Trainer(accelerator='auto',
                       max_epochs=500,
                       default_root_dir=log_path,

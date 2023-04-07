@@ -8,6 +8,7 @@ from torch.optim.lr_scheduler import SequentialLR, CosineAnnealingLR, LinearLR
 from torchmetrics.functional import f1_score
 from torchmetrics.functional.classification import binary_accuracy
 
+from utils.metric import unweighted_binary_average_precision
 from utils.misc import initialize_weights
 
 
@@ -218,7 +219,9 @@ class EndToEndInceptionTimeClassifier(LightningModule):
             # The accuracy for the anchor predictions
             f'{step}_accuracy': binary_accuracy(anchor_probs, anchor.y),
             # The F1 score for the anchor predictions
-            f'{step}_f1': f1_score(anchor_probs, anchor.y, task='binary', average='macro')},
+            f'{step}_f1': f1_score(anchor_probs, anchor.y, task='binary', average='macro'),
+            # The unweighted average precision for the anchor predictions
+            f'{step}_uap': unweighted_binary_average_precision(anchor_probs, anchor.y)},
             on_epoch=True)
 
         return total_loss
