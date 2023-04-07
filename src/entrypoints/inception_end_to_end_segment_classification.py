@@ -38,7 +38,7 @@ def main():
     dm.setup('fit')
     dm.setup('test')
 
-    model = EndToEndInceptionTimeClassifier(num_classes=1, **inception_config)
+    model = EndToEndInceptionTimeClassifier(num_classes=1, triplet_loss=True, **inception_config)
 
     checkpoint_callback = ModelCheckpoint(dirpath=checkpoint_path, monitor='val_f1', every_n_epochs=1, mode='max')
     trainer = Trainer(accelerator='auto',

@@ -153,10 +153,11 @@ def compute_semi_hard_negatives(anchor_embeddings, positive_embeddings, negative
 
 class EndToEndInceptionTimeClassifier(LightningModule):
 
-    def __init__(self, lr: float = 1e-4, wd: float = 1e-3, num_classes: int = 1, **kwargs):
+    def __init__(self, lr: float = 1e-4, wd: float = 1e-3, num_classes: int = 1, triplet_loss: bool = True, **kwargs):
         super().__init__()
         self.lr = lr
         self.wd = wd
+        self.triplet_loss = triplet_loss
         self.inception_time = LitInceptionTime(**kwargs)
         self.hidden_dim = 64
         self.classifier = nn.Sequential(*[nn.Linear(self.inception_time.out_dim, self.hidden_dim),
@@ -198,7 +199,12 @@ class EndToEndInceptionTimeClassifier(LightningModule):
         bce_losses = [self.clf_loss(pred, item.y) for item, pred in
                       zip(batch, [anchor_logits, positive_logits, negative_logits])]
         # Uniform weighting of losses (incl. triplet loss)
-        total_loss = sum([triplet_loss] + bce_losses) / 4
+        avg_bce_loss = sum(bce_losses) / 3
+
+        if self.triplet_loss:
+            total_loss = sum([triplet_loss, avg_bce_loss]) / 2
+        else:
+            total_loss = avg_bce_loss
 
         anchor_probs = sigmoid(anchor_logits)
 
