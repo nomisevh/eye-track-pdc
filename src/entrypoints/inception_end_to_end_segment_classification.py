@@ -96,7 +96,7 @@ def main():
     print(f"test trial accuracy: {binary_accuracy(test_trial_probs, test_batch.y, threshold=val_trial_threshold):.2%}"
           f" with threshold {val_trial_threshold:.2f}")
 
-    print(f"test subject uAP: {unweighted_binary_average_precision(test_subject_probs, test_subject_labels)}:.4f")
+    print(f"test subject uAP: {unweighted_binary_average_precision(test_subject_probs, test_subject_labels):.4f}")
     print(f"test subject accuracy: "
           f"{binary_accuracy(test_subject_probs, test_subject_labels, threshold=val_subject_threshold):.2%}"
           f" with threshold {val_subject_threshold:.2f}")
