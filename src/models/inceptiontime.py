@@ -5,8 +5,7 @@ from torch.nn import ModuleList, TripletMarginLoss, BCEWithLogitsLoss
 from torch.nn.functional import relu, normalize
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import SequentialLR, CosineAnnealingLR, LinearLR
-from torchmetrics.functional import f1_score
-from torchmetrics.functional.classification import binary_accuracy
+from torchmetrics.functional.classification import binary_accuracy, multiclass_f1_score
 
 from utils.metric import unweighted_binary_average_precision
 from utils.misc import initialize_weights
@@ -220,7 +219,7 @@ class EndToEndInceptionTimeClassifier(LightningModule):
             # The accuracy for the anchor predictions
             f'{step}_accuracy': binary_accuracy(anchor_probs, anchor.y),
             # The F1 score for the anchor predictions
-            f'{step}_f1': f1_score(anchor_probs, anchor.y, task='binary', average='macro'),
+            f'{step}_f1': multiclass_f1_score(anchor_probs, anchor.y.long(), num_classes=2, average='macro'),
             # The unweighted average precision for the anchor predictions
             f'{step}_uap': unweighted_binary_average_precision(anchor_probs, anchor.y)},
             on_epoch=True)
@@ -242,7 +241,7 @@ class EndToEndInceptionTimeClassifier(LightningModule):
             # The accuracy for the anchor predictions
             f'test_accuracy': binary_accuracy(probs, batch.y),
             # The F1 score for the anchor predictions
-            f'test_f1': f1_score(probs, batch.y, task='binary', average='macro')},
+            f'test_f1': multiclass_f1_score(probs, batch.y.long(), num_classes=2, average='macro')},
         )
 
     def predict_step(self, batch, batch_idx, dataloader_idx=None):

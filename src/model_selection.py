@@ -4,10 +4,10 @@ from typing import Sequence, Tuple, Any
 
 import numpy as np
 from numpy import array
-from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
 from torch import cat, Tensor
 from torch.utils.data import Dataset
+from torchmetrics.functional.classification import multiclass_accuracy
 
 from src.utils.misc import set_random_state
 
@@ -116,17 +116,16 @@ def grid_search_2d(validator: Validator, callback: Validator.Callback, dataset: 
     return scores
 
 
-def get_attribute_power(batch, pred):
+def get_attribute_power(batch, pred, threshold=0.5):
     return {
-        'vertical': compute_attribute_power(batch.a, pred, batch.y),
-        'horizontal': compute_attribute_power(1 - batch.a, pred, batch.y),
-        'prosaccade': compute_attribute_power(1 - batch.s, pred, batch.y),
-        'antisaccade': compute_attribute_power(batch.s, pred, batch.y),
-        'horizontal antisaccade': compute_attribute_power(batch.s * (1 - batch.a), pred, batch.y),
-        'dopamine': compute_attribute_power(array(batch.g != 1, dtype=int), pred, batch.y),
-        'non-dopamine': compute_attribute_power(array(batch.g != 2, dtype=int), pred, batch.y),
+        'prosaccade': compute_attribute_power(1 - batch.s, pred, batch.y, threshold=threshold),
+        'antisaccade': compute_attribute_power(batch.s, pred, batch.y, threshold=threshold),
+        'dopamine': compute_attribute_power(array(batch.g != 1, dtype=int), pred, batch.y, threshold=threshold),
+        'non-dopamine': compute_attribute_power(array(batch.g != 2, dtype=int), pred, batch.y, threshold=threshold),
     }
 
 
-def compute_attribute_power(attribute, pred, labels):
-    return f1_score(labels, pred, average='macro', sample_weight=attribute) - f1_score(labels, pred, average='macro')
+def compute_attribute_power(attribute, preds, targets, threshold=0.5):
+    preds = (preds > threshold).long()
+    return (multiclass_accuracy(preds[attribute == 1], targets[attribute == 1].long(), average='macro', num_classes=2)
+            - multiclass_accuracy(preds, targets.long(), average='macro', num_classes=2)).round(decimals=4).item()
