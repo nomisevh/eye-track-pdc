@@ -50,8 +50,10 @@ def main():
     model = EndToEndInceptionTimeClassifier(num_classes=1, triplet_loss=True, seed=SEED, **inception_config)
 
     logger = NeptuneLogger(log_model_checkpoints=False, **neptune_config, tags=TAGS)
+    print('waiting for neptune to initialize...')
+    logger.experiment.wait()
     checkpoint_callback = ModelCheckpoint(dirpath=checkpoint_path, monitor='val_uap', every_n_epochs=1, mode='max',
-                                          filename=f'{logger.version}-{{epoch}}')
+                                          filename=logger.version + '-{epoch}')
     trainer = Trainer(accelerator='auto',
                       max_epochs=300,
                       default_root_dir=log_path,
