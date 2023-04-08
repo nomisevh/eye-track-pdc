@@ -49,12 +49,14 @@ def main():
 
     model = EndToEndInceptionTimeClassifier(num_classes=1, triplet_loss=True, seed=SEED, **inception_config)
 
-    checkpoint_callback = ModelCheckpoint(dirpath=checkpoint_path, monitor='val_uap', every_n_epochs=1, mode='max')
+    logger = NeptuneLogger(log_model_checkpoints=False, **neptune_config, tags=TAGS)
+    checkpoint_callback = ModelCheckpoint(dirpath=checkpoint_path, monitor='val_uap', every_n_epochs=1, mode='max',
+                                          filename=f'{logger.version}-{{epoch}}')
     trainer = Trainer(accelerator='auto',
                       max_epochs=300,
                       default_root_dir=log_path,
                       log_every_n_steps=1,
-                      logger=NeptuneLogger(log_model_checkpoints=False, **neptune_config, tags=TAGS),
+                      logger=logger,
                       callbacks=[checkpoint_callback])
     trainer.fit(model, datamodule=dm)
 
