@@ -21,7 +21,7 @@ from utils.misc import set_random_state
 from utils.path import config_path, log_path, checkpoint_path
 from utils.visualize import visualize_latent_space
 
-TAGS = ['Final Results', 'Triplet/IPS Ablation']
+TAGS = ['Final Results', 'Main Results']
 
 
 def main():
@@ -38,16 +38,16 @@ def main():
         neptune_config = load_yaml(reader, Loader=FullLoader)
 
     dm = KIDataModule(processor_config=processor_config,
-                      use_triplets=True,
+                      use_triplets=False,
                       exclude=['vert'],
                       binary_classification=True,
                       batch_size=256,
                       val_size=0.2,
-                      ips=True)
+                      ips=False)
     dm.setup('fit')
     dm.setup('test')
 
-    model = EndToEndInceptionTimeClassifier(num_classes=1, triplet_loss=True, seed=SEED, **inception_config)
+    model = EndToEndInceptionTimeClassifier(num_classes=1, seed=SEED, **inception_config)
 
     logger = NeptuneLogger(log_model_checkpoints=False, **neptune_config, tags=TAGS)
     print('waiting for neptune to initialize...')
