@@ -217,6 +217,8 @@ class EndToEndInceptionTimeClassifier(LightningModule):
 
         anchor_probs = sigmoid(anchor_logits)
 
+        preds = (anchor_probs >= 0.5).long()
+
         self.log_dict({
             # The combined loss
             f'{step}_loss': total_loss,
@@ -227,7 +229,7 @@ class EndToEndInceptionTimeClassifier(LightningModule):
             # The accuracy for the anchor predictions
             f'{step}_accuracy': binary_accuracy(anchor_probs, anchor.y),
             # The F1 score for the anchor predictions
-            f'{step}_f1': multiclass_f1_score(anchor_probs, anchor.y.long(), num_classes=2, average='macro'),
+            f'{step}_f1': multiclass_f1_score(preds, anchor.y.long(), num_classes=2, average='macro'),
             # The unweighted average precision for the anchor predictions
             f'{step}_uap': unweighted_binary_average_precision(anchor_probs, anchor.y)},
             on_epoch=True)
@@ -241,13 +243,15 @@ class EndToEndInceptionTimeClassifier(LightningModule):
 
         probs = sigmoid(logits)
 
+        preds = (probs >= 0.5).long()
+
         self.log_dict({
             # The combined loss
             f'{step}_loss': loss,
             # The accuracy for the predictions
             f'{step}_accuracy': binary_accuracy(probs, batch.y),
-            # The F1 score for the predictions
-            f'{step}_f1': multiclass_f1_score(probs, batch.y.long(), num_classes=2, average='macro'),
+            # The unweighted F1 score for the predictions
+            f'{step}_f1': multiclass_f1_score(preds, batch.y.long(), num_classes=2, average='macro'),
             # The unweighted average precision for the predictions
             f'{step}_uap': unweighted_binary_average_precision(probs, batch.y)},
             on_epoch=True)
