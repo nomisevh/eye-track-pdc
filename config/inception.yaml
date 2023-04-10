@@ -22,3 +22,5 @@ anchor_swap: True
 triplet_margin: 0.2
 # Whether to normalize the output features to the unit hypersphere
 normalize_output: True
+# Whether to use a single linear fully connected layer or a deeper MLP for classification
+linear_clf: False

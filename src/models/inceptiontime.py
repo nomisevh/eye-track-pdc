@@ -154,24 +154,28 @@ def compute_semi_hard_negatives(anchor_embeddings, positive_embeddings, negative
 class EndToEndInceptionTimeClassifier(LightningModule):
 
     def __init__(self, lr: float = 1e-4, wd: float = 1e-3, num_classes: int = 1, triplet_loss: bool = True,
-                 seed: int = None, **kwargs):
+                 seed: int = None, linear_clf: bool = False, **kwargs):
         super().__init__()
         self.lr = lr
         self.wd = wd
         self.triplet_loss = triplet_loss
         self.inception_time = LitInceptionTime(**kwargs)
         self.hidden_dim = 64
-        self.classifier = nn.Sequential(*[nn.Linear(self.inception_time.out_dim, self.hidden_dim),
-                                          nn.Dropout(),
-                                          nn.ReLU(),
-                                          nn.Linear(self.hidden_dim, self.hidden_dim),
-                                          nn.Dropout(),
-                                          nn.ReLU(),
-                                          nn.Linear(self.hidden_dim, self.hidden_dim),
-                                          nn.Dropout(),
-                                          nn.ReLU(),
-                                          nn.Linear(self.hidden_dim, num_classes),
-                                          ])
+        # Todo: this should not be a boolean parameter.
+        if linear_clf:
+            self.classifier = nn.Linear(self.inception_time.out_dim, num_classes)
+        else:
+            self.classifier = nn.Sequential(*[nn.Linear(self.inception_time.out_dim, self.hidden_dim),
+                                              nn.Dropout(),
+                                              nn.ReLU(),
+                                              nn.Linear(self.hidden_dim, self.hidden_dim),
+                                              nn.Dropout(),
+                                              nn.ReLU(),
+                                              nn.Linear(self.hidden_dim, self.hidden_dim),
+                                              nn.Dropout(),
+                                              nn.ReLU(),
+                                              nn.Linear(self.hidden_dim, num_classes),
+                                              ])
 
         self.triplet_loss_fn = self.inception_time.loss_fn
         self.clf_loss = BCEWithLogitsLoss()
