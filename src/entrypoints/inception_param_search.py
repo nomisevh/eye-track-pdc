@@ -45,6 +45,7 @@ def main():
                               default_root_dir=log_path,
                               log_every_n_steps=1,
                               callbacks=[validation_metric_callback],
+                              enable_checkpointing=False,
                               )
             dm.setup(stage='fit')
             trainer.fit(model, datamodule=dm)
