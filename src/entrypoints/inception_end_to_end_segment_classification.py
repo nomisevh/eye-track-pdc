@@ -82,31 +82,42 @@ def main():
     _, val_subject_labels, val_subject_probs = vote_aggregation(segment_scores=val_trial_probs, labels=val_batch.y,
                                                                 aggregate_by=val_batch.z)
 
-    # Find the best trial threshold with respect to the unweighted f1 score on the validation set
-    _, val_trial_threshold = max_f1_score(val_trial_probs, val_batch.y)
     # Find the best subject threshold with respect to the unweighted f1 score on the validation set
     _, val_subject_threshold = max_f1_score(val_subject_probs, val_subject_labels)
-
-    # For fun do the same for the test set
-    _, test_trial_threshold = max_f1_score(test_trial_probs, test_batch.y)
+    # Find the best subject threshold with respect to the unweighted f1 score on the test set
     _, test_subject_threshold = max_f1_score(test_subject_probs, test_subject_labels)
 
-    # Compute unweighted average precision and accuracy for trials and subjects on the test set
-    print(f"test trial uAP: {unweighted_binary_average_precision(test_trial_probs, test_batch.y):.4f}")
-    print(f"test trial accuracy: {binary_accuracy(test_trial_probs, test_batch.y, threshold=val_trial_threshold):.2%}"
-          f" with threshold {val_trial_threshold:.2f}")
+    # Compute unweighted F1 and accuracy for trials and subjects on the test set
+    test_trial_uf1_score = multiclass_f1_score((test_trial_probs >= 0.5).long(), test_batch.y.long(), num_classes=2,
+                                               average='macro')
+    test_subject_uf1_score_best = multiclass_f1_score((test_subject_probs >= test_subject_threshold).long(),  # noqa
+                                                      test_subject_labels.long(), num_classes=2, average='macro')
+    test_subject_uf1_score_val = multiclass_f1_score((test_subject_probs >= val_subject_threshold).long(),  # noqa
+                                                     test_subject_labels.long(), num_classes=2, average='macro')
 
-    print(f"test subject uAP: {unweighted_binary_average_precision(test_subject_probs, test_subject_labels):.4f}")
-    print(f"test subject accuracy: "
+    # Report the results on trial level
+    print(f"test trial uF1: {test_trial_uf1_score :.4f}")
+    print(f"test trial accuracy: {binary_accuracy(test_trial_probs, test_batch.y):.2%}"
+          f" with threshold 0.5")
+
+    # Report the results on subject level with the best threshold found on the validation set
+    print(f"test subject uF1 (val threshold): {test_subject_uf1_score_val:.4f}")
+    print(f"test subject accuracy (val threshold): "
           f"{binary_accuracy(test_subject_probs, test_subject_labels, threshold=val_subject_threshold):.2%}"
           f" with threshold {val_subject_threshold:.2f}")
 
+    # Report the results on subject level with the best threshold found on the test set
+    print(f"test subject uF1 (test threshold): {test_subject_uf1_score_best:.4f}")
+    print(f"test subject accuracy (test threshold): "
+          f"{binary_accuracy(test_subject_probs, test_subject_labels, threshold=test_subject_threshold):.2%}"
+          f" with threshold {test_subject_threshold:.2f}")
+
     # Perform attribute-based subgroup evaluation
-    attribute_power = get_attribute_power(test_batch, test_trial_probs, val_trial_threshold)
+    attribute_power = get_attribute_power(test_batch, test_trial_probs, threshold=0.5)
     attribute_power = {k: f'{v:.2%}' for k, v in attribute_power.items()}
     print(f'Attribute power: {attribute_power}')
 
-    figure = ConfusionMatrixDisplay.from_predictions(test_batch.y, (test_trial_probs >= val_trial_threshold).int(),
+    figure = ConfusionMatrixDisplay.from_predictions(test_batch.y, (test_trial_probs >= 0.5).int(),
                                                      display_labels=dm.class_names(),
                                                      cmap='Blues')
     figure.ax_.set_title('Trial Classification')
@@ -116,11 +127,18 @@ def main():
                                                      (test_subject_probs >= val_subject_threshold).int(),  # noqa
                                                      display_labels=dm.class_names(),
                                                      cmap='Blues')
-    figure.ax_.set_title('Subject Classification')
+    figure.ax_.set_title('Subject Classification (Validation Threshold)')
+    plt.show()
+
+    figure = ConfusionMatrixDisplay.from_predictions(test_subject_labels,
+                                                     (test_subject_probs >= test_subject_threshold).int(),  # noqa
+                                                     display_labels=dm.class_names(),
+                                                     cmap='Blues')
+    figure.ax_.set_title('Subject Classification (Test Threshold)')
     plt.show()
 
     # Visualize the latent neighborhoods with TSNE
-    plot_latent_neighborhood(model, test_batch, dm)
+    # plot_latent_neighborhood(model, test_batch, dm)
 
 
 def plot_latent_neighborhood(model, eval_batch, dm):
