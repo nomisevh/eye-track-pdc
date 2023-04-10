@@ -1,5 +1,5 @@
 # The number of inception modules
-depth: 3
+depth: 5
 # The number of input dimensions
 in_dim: 6
 # The number of hidden dimensions
