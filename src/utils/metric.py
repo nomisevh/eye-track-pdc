@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from pytorch_lightning import Callback
 from torch import sigmoid
 from torchmetrics.classification import MulticlassAveragePrecision
 
@@ -40,3 +41,19 @@ def max_f1_score(pred, targets, num_thresholds=100):
         f1_scores[i] = multiclass_f1_score(probs, targets.long(), num_classes=2, average='macro')
 
     return f1_scores.max().item(), thresholds[f1_scores.argmax()].item()
+
+
+class ValidationMetricCallback(Callback):
+    def __init__(self, metric, mode='max'):
+        super().__init__()
+        self.metric = metric
+        self.mode = mode
+        self.best = None
+
+    def on_validation_epoch_end(self, trainer, pl_module):
+        if self.mode == 'max':
+            current = trainer.logged_metrics[self.metric]
+            if self.best is None or current > self.best:
+                self.best = current
+        else:
+            raise NotImplementedError()

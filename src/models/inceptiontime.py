@@ -272,8 +272,9 @@ class EndToEndInceptionTimeClassifier(LightningModule):
         self.log_dict({
             # The accuracy for the anchor predictions
             f'test_accuracy': binary_accuracy(probs, batch.y),
-            # The F1 score for the anchor predictions
-            f'test_f1': multiclass_f1_score(probs, batch.y.long(), num_classes=2, average='macro')},
+            # The unweighted average precision for the predictions
+            f'test_uap': unweighted_binary_average_precision(probs, batch.y),
+        },
         )
 
     def predict_step(self, batch, batch_idx, dataloader_idx=None):
