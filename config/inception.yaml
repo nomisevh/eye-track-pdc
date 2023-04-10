@@ -24,3 +24,5 @@ triplet_margin: 0.2
 normalize_output: True
 # Whether to use a single linear fully connected layer or a deeper MLP for classification
 linear_clf: False
+# Which type of loss to use
+loss_type: triplet
