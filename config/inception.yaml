@@ -22,7 +22,9 @@ anchor_swap: True
 triplet_margin: 0.2
 # Whether to normalize the output features to the unit hypersphere
 normalize_output: False
-# Whether to use a single linear fully connected layer or a deeper MLP for classification
-linear_clf: True
 # Which type of loss to use
 loss_type: bce
+# The number of hidden layers in the MLP classifier
+n_hidden_clf_layers: 0
+# The number of hidden dimensions in the MLP classifier
+clf_hidden_dim: 64

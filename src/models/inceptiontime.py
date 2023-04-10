@@ -155,27 +155,27 @@ class EndToEndInceptionTimeClassifier(LightningModule):
 
     # TODO loss_type should be an entire loss function, not just a string.
     def __init__(self, lr: float = 1e-4, wd: float = 1e-3, num_classes: int = 1, loss_type: str = 'triplet',
-                 seed: int = None, linear_clf: bool = False, **kwargs):
+                 seed: int = None, n_hidden_clf_layers: int = 0, clf_hidden_dim: int = 64, **kwargs):
         super().__init__()
 
         self.lr = lr
         self.wd = wd
         self.loss_type = loss_type
         self.inception_time = LitInceptionTime(**kwargs)
-        self.hidden_dim = 64
-        # Todo: this should not be a boolean parameter.
-        if linear_clf:
+        self.hidden_dim = clf_hidden_dim
+
+        if n_hidden_clf_layers == 0:
             self.classifier = nn.Linear(self.inception_time.out_dim, num_classes)
         else:
+            middle_layers = []
+            for _ in range(n_hidden_clf_layers - 1):
+                middle_layers.extend([nn.Linear(self.hidden_dim, self.hidden_dim),
+                                      nn.Dropout(),
+                                      nn.ReLU()])
             self.classifier = nn.Sequential(*[nn.Linear(self.inception_time.out_dim, self.hidden_dim),
                                               nn.Dropout(),
                                               nn.ReLU(),
-                                              nn.Linear(self.hidden_dim, self.hidden_dim),
-                                              nn.Dropout(),
-                                              nn.ReLU(),
-                                              nn.Linear(self.hidden_dim, self.hidden_dim),
-                                              nn.Dropout(),
-                                              nn.ReLU(),
+                                              *middle_layers,
                                               nn.Linear(self.hidden_dim, num_classes),
                                               ])
 
