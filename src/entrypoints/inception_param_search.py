@@ -39,7 +39,7 @@ def main():
 
             # Overwrite InceptionTime config
             model = EndToEndInceptionTimeClassifier(**{**inception_config, **kwargs})
-            validation_metric_callback = ValidationMetricCallback(metric='val_uap', mode='max')
+            validation_metric_callback = ValidationMetricCallback(metric='val_f1', mode='max')
             trainer = Trainer(accelerator='auto',
                               max_epochs=100,
                               default_root_dir=log_path,

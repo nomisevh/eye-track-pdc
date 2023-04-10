@@ -52,7 +52,7 @@ def main():
     logger = NeptuneLogger(log_model_checkpoints=False, **neptune_config, tags=TAGS)
     print('waiting for neptune to initialize...')
     logger.experiment.wait()
-    checkpoint_callback = ModelCheckpoint(dirpath=checkpoint_path, monitor='val_uap', every_n_epochs=1, mode='max',
+    checkpoint_callback = ModelCheckpoint(dirpath=checkpoint_path, monitor='val_f1', every_n_epochs=1, mode='max',
                                           filename=logger.version + '-{epoch}')
     trainer = Trainer(accelerator='auto',
                       max_epochs=300,
