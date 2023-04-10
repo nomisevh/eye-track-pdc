@@ -1,13 +1,13 @@
 # The number of inception modules
-depth: 2
+depth: 3
 # The number of input dimensions
 in_dim: 6
 # The number of hidden dimensions
 hidden_dim: 32
 # The dimensionality of the bottleneck layer
-bottleneck_dim: 46
+bottleneck_dim: 32
 # The base kernel size, the sizes of the kernels are computed as [base_kernel_size // (2 ** i) for i in range(3)]
-base_kernel_size: 32
+base_kernel_size: 40
 # Whether to use residual connections
 use_residuals: True
 # The learning rate
@@ -21,8 +21,8 @@ anchor_swap: True
 # The margin for the triplet loss
 triplet_margin: 0.2
 # Whether to normalize the output features to the unit hypersphere
-normalize_output: True
+normalize_output: False
 # Whether to use a single linear fully connected layer or a deeper MLP for classification
-linear_clf: False
+linear_clf: True
 # Which type of loss to use
-loss_type: triplet
+loss_type: bce
