@@ -43,10 +43,10 @@ def k_fold_cross_validator(dataset: Dataset, k: int, splitter=None) -> Tuple[Dat
         folds.append(fold)
 
     for i in range(len(folds)):
-        # Let fold be the train split
-        train_ds = folds[i]
-        # Let all other folds be the test split
-        test_ds = concat_datasets([fold for j, fold in enumerate(folds) if i != j])
+        # Let fold be the test split
+        test_ds = folds[i]
+        # Let all other folds be the train split
+        train_ds = concat_datasets([fold for j, fold in enumerate(folds) if i != j])
 
         yield train_ds, test_ds
 
