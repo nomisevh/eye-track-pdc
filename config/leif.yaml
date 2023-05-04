@@ -17,9 +17,9 @@ sanitation:
 # The parameters for the file normalization
 file_normalization:
   # Which normalization method to use
-  which: saccade_amplitude
+  which: target
   # The width of the trailing window for the median approximation of the saccade amplitude
-  trailing_window_width: 150  # datapoints
+  # trailing_window_width: 150  # datapoints
   # The factor by which the signal is scaled after normalization
   scaling_factor: 10
 
@@ -40,5 +40,3 @@ channels:
   - drift
   - position_velocity
   - drift_velocity
-  - position_diff
-  - drift_diff
