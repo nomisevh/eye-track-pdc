@@ -3,8 +3,6 @@ from collections import namedtuple
 from os import makedirs
 from os.path import exists, isfile
 
-import numpy as np
-from matplotlib import pyplot as plt
 from numpy import array
 from sklearn.model_selection import train_test_split
 from torch import tensor, int as torch_int, bool as torch_bool, save, load, isin, logical_not, argwhere, \
@@ -19,6 +17,7 @@ from utils.ki import LABELS as KI_LABELS, FILENAME_REGEX as KI_FILENAME_REGEX, A
     load_data
 from utils.misc import torch_unique_index
 from utils.path import ki_data_tmp_path, config_path
+from utils.visualize import plot_trial
 
 Signature = namedtuple('Signature', ['x', 'y', 'z', 'r', 'a', 's', 'g'])
 
@@ -233,32 +232,13 @@ def test():
 
     processor = Leif(config)
 
-    ds = KIDataset(data_processor=processor, train=True, bundle_as_experiments=False, use_triplets=False)
-    # plot_series_samples(ds.x[:, 0], labels=ds.y, n=10)
-
+    ds = KIDataset(data_processor=processor, train=True, bundle_as_experiments=False, use_triplets=False,
+                   exclude=['vert'])
     binarize(ds)
 
-    example = ds[90]
-    print()
+    example = ds[0]
 
-    fig, ax = plt.subplots(figsize=(7, 5), dpi=300)
-    x = np.arange(example.x.shape[1])
-    y = example.x
-    ax.plot(x, y[0], label='x')
-    ax.plot(x, y[1], label='y')
-    ax.plot(x, y[2], label='x vel')
-    ax.plot(x, y[3], label='y vel')
-    ax.plot(x, y[4], label='x inter-eye difference')
-    ax.plot(x, y[5], label='y inter-eye difference')
-
-    ax.set_ylim(-1, 1)
-    ax.set_title('Focused Gaze - Processed Segment')
-    ax.set_xlabel('Step')
-    ax.set_ylabel('Normalized Gaze Position')
-    ax.legend(ncol=2)
-    plt.show()
-    fig.savefig('samples.png')
-
+    plot_trial(example)
     ds.batch()
     ds.flatten()
 
