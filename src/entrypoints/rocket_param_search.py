@@ -61,7 +61,7 @@ def main():
             return f1
 
     # Prepare data
-    train_val_ds = KIDataset(data_processor=Leif(processor_config), train=True, use_triplets=False)
+    train_val_ds = KIDataset(data_processor=Leif(processor_config), exclude=['vert'], train=True, use_triplets=False)
 
     # Initialize validator
     validator = Validator(num_random_inits=1, num_folds=5, splitter=train_test_split_stratified)

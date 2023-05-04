@@ -53,15 +53,15 @@ def main():
             return validation_metric_callback.best.item()
 
     # Prepare data
-    train_val_ds = KIDataset(data_processor=Leif(processor_config), train=True, use_triplets=False)
+    train_val_ds = KIDataset(data_processor=Leif(processor_config), exclude=['vert'], train=True, use_triplets=False)
 
     # Initialize validator
-    validator = Validator(num_random_inits=2, num_folds=5, splitter=train_test_split_stratified)
+    validator = Validator(num_random_inits=1, num_folds=5, splitter=train_test_split_stratified)
 
     # Perform grid search
     _ = grid_search_2d(validator, Callback(), train_val_ds,
-                       depth=[2],
-                       bottleneck_dim=[46])
+                       depth=[5],
+                       hidden_dim=[16, 32, 64]),
 
 
 if __name__ == '__main__':
