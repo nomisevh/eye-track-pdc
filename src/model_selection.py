@@ -7,9 +7,10 @@ from numpy import array
 from sklearn.model_selection import train_test_split
 from torch import cat, Tensor
 from torch.utils.data import Dataset
-from torchmetrics.functional.classification import multiclass_accuracy
+from torchmetrics.functional.classification import binary_accuracy
 
 from src.utils.misc import set_random_state
+from utils.path import log_path
 
 
 def concat_datasets(datasets: Sequence[Dataset]):
@@ -110,8 +111,8 @@ def grid_search_2d(validator: Validator, callback: Validator.Callback, dataset: 
 
             scores[i, j], deviations[i, j] = validator(callback, dataset, **{p1: p1_val, p2: p2_val})
 
-    np.savetxt('grid_search_result_mean.csv', scores, delimiter=',')  # noqa
-    np.savetxt('grid_search_result_std.csv', deviations, delimiter=',')  # noqa
+    np.savetxt(log_path.joinpath('grid_search_result_mean.csv'), scores, delimiter=',')  # noqa
+    np.savetxt(log_path.joinpath('grid_search_result_std.csv'), deviations, delimiter=',')  # noqa
 
     return scores
 
@@ -125,7 +126,7 @@ def get_attribute_power(batch, pred, threshold=0.5):
     }
 
 
-def compute_attribute_power(attribute, preds, targets, threshold=0.5):
-    preds = (preds > threshold).long()
-    return (multiclass_accuracy(preds[attribute == 1], targets[attribute == 1].long(), average='macro', num_classes=2)
-            - multiclass_accuracy(preds, targets.long(), average='macro', num_classes=2)).round(decimals=4).item()
+def compute_attribute_power(attribute, preds, targets):
+    subgroup_acc = binary_accuracy(preds[attribute == 1], targets[attribute == 1].long()).round(decimals=4).item()
+    all_data_acc = binary_accuracy(preds, targets.long()).round(decimals=4).item()
+    return subgroup_acc - all_data_acc
