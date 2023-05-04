@@ -112,7 +112,7 @@ def main(seed):
           f"{binary_accuracy(val_subject_probs, val_subject_labels, threshold=val_subject_threshold):.2%}")
 
     # Perform attribute-based subgroup evaluation
-    attribute_power = get_attribute_power(test_batch, test_trial_probs, threshold=0.5)
+    attribute_power = get_attribute_power(test_batch, test_trial_probs)
     attribute_power = {k: f'{v:.2%}' for k, v in attribute_power.items()}
     print(f'Attribute power: {attribute_power}')
 

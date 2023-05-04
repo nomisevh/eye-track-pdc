@@ -126,7 +126,8 @@ def get_attribute_power(batch, pred, threshold=0.5):
     }
 
 
-def compute_attribute_power(attribute, preds, targets):
-    subgroup_acc = binary_accuracy(preds[attribute == 1], targets[attribute == 1].long()).round(decimals=4).item()
-    all_data_acc = binary_accuracy(preds, targets.long()).round(decimals=4).item()
+def compute_attribute_power(attribute, preds, targets, threshold):
+    subgroup_acc = binary_accuracy(preds[attribute == 1], targets[attribute == 1].long(), threshold=threshold).round(
+        decimals=4).item()
+    all_data_acc = binary_accuracy(preds, targets.long(), threshold=threshold).round(decimals=4).item()
     return subgroup_acc - all_data_acc
