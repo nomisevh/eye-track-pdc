@@ -1,4 +1,4 @@
 # The number of random kernels in the rocket transformation
-n_kernels: 1000
+n_kernels: 10000
 # Whether to normalize the output features
 normalize: True
