@@ -12,8 +12,8 @@ from matplotlib import pyplot as plt
 from pandas import DataFrame
 from tqdm.auto import tqdm
 
-from src.utils.data import interpolate_outliers
-from src.utils.path import walk_of_life, ki_data_path
+from utils.data import interpolate_outliers
+from utils.path import walk_of_life, ki_data_path
 
 LABELS: Dict[str, int] = {'HC': 0, 'PDOFF': 1, 'PDON': 2}
 AXIS: Dict[str, int] = {'horiz': 0, 'vert': 1}

@@ -9,7 +9,7 @@ from torch import cat, Tensor
 from torch.utils.data import Dataset
 from torchmetrics.functional.classification import binary_accuracy
 
-from src.utils.misc import set_random_state
+from utils.misc import set_random_state
 from utils.path import log_path
 
 
