@@ -141,5 +141,6 @@ local/
 *.docx
 checkpoint/
 log/
+!log/.gitkeep
 config/neptune.yaml
 **/.neptune
