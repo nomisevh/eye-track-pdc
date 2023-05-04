@@ -21,7 +21,7 @@ class Leif(MainProcessor):
 
     def __init__(self, config: dict):
         self.sanitizer = FileFilter(**config['sanitation'])
-        normalization_method = config['file_normalization'].pop('which')
+        normalization_method = config['file_normalization']['which']
         if normalization_method == 'saccade_amplitude':
             self.file_normalizer = SaccadeAmplitudeNormalizer(**config['file_normalization'])
         elif normalization_method == 'target':
@@ -126,7 +126,7 @@ class TargetBasedNormalizer(BatchProcessor):
     """
     NORMALIZE_CHANNELS = ["position", "drift", "target", "position_diff", "drift_diff"]
 
-    def __init__(self, *, scaling_factor=10):
+    def __init__(self, *, scaling_factor=10, **kwargs):
         """
         :param scaling_factor: The factor by which we scale the saccade amplitude before normalizing.
             10 gives a good range of values for KI dataset.
@@ -134,11 +134,26 @@ class TargetBasedNormalizer(BatchProcessor):
         self.scaling_factor = scaling_factor
 
     def __call__(self, frames: List[DataFrame], **kwargs) -> List[DataFrame]:
-        # TODO I hope it works to do this in place
+        skipped = 0
+        normalized_frames = []
+
         for df in frames:
-            df[self.NORMALIZE_CHANNELS] /= df["target"].abs().max()
+            target = df["target"]
+            target_diff = target.diff().fillna(0)
+            anchors = [*target[target_diff != 0].index.tolist()]
+            if not len(anchors):
+                skipped += 1
+                continue
+
+            df[self.NORMALIZE_CHANNELS] /= target.abs().max()
             df[self.NORMALIZE_CHANNELS] *= self.scaling_factor
-        return frames
+
+            normalized_frames.append(df)
+
+        if skipped > 0:
+            print(f"skipped {skipped} files (no target movement)")
+
+        return normalized_frames
 
 
 class FileFilter(BatchProcessor):
