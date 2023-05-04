@@ -1,17 +1,16 @@
 from matplotlib import pyplot as plt
-from matplotlib.colors import to_rgba
-from numpy import linspace, arange, in1d
+from matplotlib import pyplot as plt
+from numpy import arange
 from sklearn.manifold import TSNE
 from torch import repeat_interleave
 from yaml import load as load_yaml, FullLoader
 
 from datamodule import KIDataModule
 from dataset import Signature, KIDataset
-from models.inceptiontime import LitInceptionTime
+from models.inceptiontime import EndToEndInceptionTimeClassifier
 from utils.const import SEED
 from utils.misc import set_random_state
 from utils.path import config_path, checkpoint_path
-from utils.visualize import visualize_latent_space
 
 
 def main():
@@ -30,7 +29,7 @@ def main():
     dm.setup('fit')
     dm.setup('test')
 
-    model = LitInceptionTime.load_from_checkpoint(checkpoint_path.joinpath('epoch=459-step=1840.ckpt'))
+    model = EndToEndInceptionTimeClassifier.load_from_checkpoint(checkpoint_path.joinpath('PDC-322-epoch=149.ckpt'))
     # Freeze parameters of the encoder
     model.freeze()
 
@@ -48,31 +47,30 @@ def main():
 
     val_batch = Signature(**attributes)
 
-    val_embeddings = model(val_batch.x)
+    val_embeddings, _ = model(val_batch.x)
 
-    experiment = 15
     num_segments = val_batch_exp.x.shape[1]
-    indices = arange(experiment * num_segments, (experiment + 1) * num_segments).astype(int)
-    inverse_indices = in1d(arange(val_embeddings.shape[0]), indices, invert=True)
+
+    # Use modulo to get the index of each segment in the flattened batch, relative to every experiment
+    index_in_experiment = arange(val_embeddings.shape[0]) % num_segments
 
     # Visualize the latent neighborhoods with TSNE
-    tsne = TSNE(n_components=2, perplexity=15)
+    tsne = TSNE(n_components=2, perplexity=50)
     manifold = tsne.fit_transform(val_embeddings)
-    # Visualize the latent space for all segments except the ones belonging to the experiment
-    fig, ax = visualize_latent_space(manifold[inverse_indices], val_batch.y[inverse_indices], dm.class_names(),
-                                     show=False)
 
-    # Plot the segments for the experiment to visualize the latent trace of the segments
-    manifold_exp = manifold[indices]
-    # Manually set colors to have different opacity depending on the time of the segment
-    color = [to_rgba('crimson', alpha) for alpha in linspace(1, 0.2, num_segments)]
-    ax.scatter(manifold_exp[:, 0], manifold_exp[:, 1], c=color, s=40, label=f'Experiment {experiment}')
-    ax.set_title('PD Diseased Experiment')
+    fig, ax = plt.subplots(figsize=(7, 5), dpi=400)
+
+    scatter = ax.scatter(manifold[:, 0], manifold[:, 1],
+                         c=index_in_experiment,
+                         cmap='plasma', s=40)
+
+    cbar = plt.colorbar(scatter, ax=ax)
+    ax.legend(handles=scatter.legend_elements()[0], labels=dm.class_names())
+    ax.set_title('Trials by Index in Session')
+    ax.set_xlabel('Dimension 1')
+    ax.set_ylabel('Dimension 2')
+    cbar.ax.set_ylabel('Index in Session (s)')
     plt.show()
-    print(f'label: {val_batch_exp.y[experiment]}')
-    print(f'group: {val_batch_exp.g[experiment]}')
-    print(f'a: {val_batch_exp.a[experiment]}')
-    print(f's: {val_batch_exp.s[experiment]}')
 
 
 if __name__ == '__main__':
