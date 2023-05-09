@@ -3,11 +3,10 @@ import torch
 from pytorch_lightning import Callback
 from torch import sigmoid
 from torchmetrics.classification import MulticlassAveragePrecision
-
-# Only works for binary classification. Pass either logits or scores ~[0, 1].
 from torchmetrics.functional.classification import multiclass_f1_score
 
 
+# Only works for binary classification. Pass either logits or scores ~[0, 1].
 def vote_aggregation(*, segment_logits=None, segment_scores=None, labels, aggregate_by, threshold=0.2):
     unique, inv_idx = np.unique(aggregate_by, return_inverse=True)
     patient_pred = torch.zeros(unique.shape)
@@ -33,6 +32,7 @@ def unweighted_binary_average_precision(preds, targets):
     return MulticlassAveragePrecision(num_classes=2, average='macro')(multi_class_probs, targets.long())
 
 
+# Finds the best binary threshold with respect to the unweighted f1 score
 def max_f1_score(pred, targets, num_thresholds=100):
     f1_scores = torch.zeros(num_thresholds)
     thresholds = torch.linspace(0, 1, num_thresholds)

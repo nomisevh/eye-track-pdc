@@ -18,9 +18,13 @@ class KIDataModule(LightningDataModule):
         :param processor_config: config for the data processor. If train_ds is not passed, this is a mandatory argument.
         :param bundle_as_experiments: whether to bundle datapoints by experiment
         :param use_triplets: whether to return triplets
+        :param exclude: a list of data categories to exclude
         :param val_size: the relative size of the validation split
         :param binary_classification: whether to binarize the labels
         :param batch_size: the size of mini-batches, if -1 then equal to the length of the dataset
+        :param num_workers: the number of workers for the dataloaders
+        :param sources: the data sources to use
+        :param ips: whether to use interpersonal sampling
         """
         super().__init__()
         self.train_ds, self.val_ds, self.test_ds = None, None, None
@@ -46,6 +50,8 @@ class KIDataModule(LightningDataModule):
             stringified_processor_config = stringify_unsupported(processor_config)
             self.save_hyperparameters(stringified_processor_config)
 
+        # If prepared datasets were passed to init, don't log them as hyperparameters.
+        # Likewise, don't log the processor config, since it holds unsupported parameter types. (handled above)
         self.save_hyperparameters(ignore=['train_ds', 'val_ds', 'test_ds', 'processor_config'])
 
     def setup(self, stage: str):
@@ -53,7 +59,7 @@ class KIDataModule(LightningDataModule):
         if stage == "fit" and self.train_ds is None:
             train_val_ds = KIDataset(data_processor=self.processor,
                                      train=True,
-                                     bundle_as_experiments=self.bundle_as_experiments,
+                                     bundle_as_sessions=self.bundle_as_experiments,
                                      use_triplets=self.use_triplets,
                                      exclude=self.exclude,
                                      sources=self.sources,
@@ -67,7 +73,7 @@ class KIDataModule(LightningDataModule):
         if stage == "test":
             self.test_ds = KIDataset(data_processor=self.processor,
                                      train=False,
-                                     bundle_as_experiments=self.bundle_as_experiments,
+                                     bundle_as_sessions=self.bundle_as_experiments,
                                      use_triplets=False,
                                      exclude=self.exclude,
                                      sources=self.sources)
@@ -102,14 +108,14 @@ class KIDataModule(LightningDataModule):
         if self.val_ds is not None:
             self.val_ds.use_triplets = value
 
-    # Flattens the datasets, i.e. removes the experiment dimension
+    # Flattens the datasets, i.e. removes the session dimension
     def flatten(self):
         self.train_ds.flatten()
         self.val_ds.flatten()
         if self.test_ds is not None:
             self.test_ds.flatten()
 
-    # Batches the datasets, i.e. adds the experiment dimension
+    # Batches the datasets, i.e. adds the session dimension
     def batch(self):
         self.train_ds.batch()
         self.val_ds.batch()

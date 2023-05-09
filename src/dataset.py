@@ -26,12 +26,22 @@ class KIDataset(Dataset):
     # All the attributes that have a single value per data point
     SINGULAR_ATTRIBUTES = [attr for attr in Signature._fields if attr != 'x']
 
-    def __init__(self, *, data_processor: MainProcessor, train: bool, bundle_as_experiments=False, use_triplets=False,
+    def __init__(self, *, data_processor: MainProcessor, train: bool, bundle_as_sessions=False, use_triplets=False,
                  exclude=None, sources=('HC', 'PD_OFF', 'PD_ON'), ips: bool = False):
+        """
+        :param data_processor: The data processor to use for processing the data
+        :param train: Whether to use the train or test set
+        :param bundle_as_sessions: Whether to bundle the data as sessions
+        :param use_triplets: Whether to return triplets
+        :param exclude: List of data categories to exclude
+        :param sources: List of data sources to use
+        :param ips: Whether to use interpersonal sampling
+        """
+
         self.use_triplets = use_triplets
         self.ips = ips
 
-        file_path = ki_data_tmp_path.joinpath(self.format_filename(train, bundle_as_experiments, sources))
+        file_path = ki_data_tmp_path.joinpath(self.format_filename(train, bundle_as_sessions, sources))
 
         # Use cached version of dataset if available
         if isfile(file_path):
@@ -44,29 +54,29 @@ class KIDataset(Dataset):
             # Only keep the filenames of the files that were not filtered out
             filenames = array(filenames)[kept]
 
-            if bundle_as_experiments:
-                x, y, z, r, a, s, g = populate_ki_experiments(segmented_files, filenames)
+            if bundle_as_sessions:
+                x, y, z, r, a, s, g = populate_ki_sessions(segmented_files, filenames)
                 # Tensor with shape (N, L, M, T) holding the multivariate time series.
-                # N is number of data points, L is the number of segments in each experiment, M is the dimensionality and
+                # N is number of sessions, L is the number of trials in each session, M is the dimensionality and
                 # T is the length of the series.
                 self.x = tensor(array(x)).float().permute(0, 1, 3, 2)
             else:
-                x, y, z, r, a, s, g = populate_ki_segments(segmented_files, filenames)
+                x, y, z, r, a, s, g = populate_ki_trials(segmented_files, filenames)
                 # Tensor with shape (N, M, T) holding the multivariate time series.
-                # N is number of data points, M is the dimensionality and T is the length of the series.
+                # N is number of trials, M is the dimensionality and T is the length of the series.
                 self.x = tensor(array(x)).float().permute(0, 2, 1)
 
             # Tensor with shape (N) holding the labels
             self.y = tensor(y).float()
-            # Tensor with shape (N) holding which patient the data points belong to
+            # Tensor with shape (N) holding which individual the data points belong to
             self.z = tensor(z, dtype=torch_int)
-            # Tensor with shape (N) holding which experiment each segment belongs to
+            # Tensor with shape (N) holding which session each trial belongs to
             self.r = tensor(r, dtype=torch_int)
-            # Tensor with shape (N) holding the axis each segment is aligned with (0:'horiz', 1:'vert')
+            # Tensor with shape (N) holding the axis each trial is aligned with (0:'horiz', 1:'vert')
             self.a = tensor(a, dtype=torch_int)
-            # Tensor with shape (N) holding the saccade type of each segment (0:'pro', 1:'anti')
+            # Tensor with shape (N) holding the saccade type of each trial (0:'pro', 1:'anti')
             self.s = tensor(s, dtype=torch_int)
-            # Tensor with shape (N) holding the group each segment belongs to (0:'HC', 1:'PDOFF', 2:'PDON')
+            # Tensor with shape (N) holding the group each trial belongs to (0:'HC', 1:'PDOFF', 2:'PDON')
             # Similar to y but is not affected by binarization.
             self.g = tensor(g, dtype=torch_int)
 
@@ -174,13 +184,13 @@ class KIDataset(Dataset):
         return f"ki-{','.join(sources)}-{'trial' if bundle_as_trials else 'seg'}-{'train' if train else 'test'}.pth"
 
 
-def populate_ki_segments(segmented_files, filenames):
+def populate_ki_trials(segmented_files, filenames):
     datapoints = []
-    for trial, (segments, filename) in enumerate(zip(segmented_files, filenames)):
+    for trial, (trials, filename) in enumerate(zip(segmented_files, filenames)):
         individual, group, axis, saccade = KI_FILENAME_REGEX.findall(filename)[0]
-        for seg in segments:
+        for t in trials:
             datapoints.append(Signature(
-                x=seg.values,
+                x=t.values,
                 y=KI_LABELS[group],
                 z=int(individual),
                 r=trial,
@@ -191,15 +201,15 @@ def populate_ki_segments(segmented_files, filenames):
     return zip(*datapoints)
 
 
-def populate_ki_experiments(segmented_files, filenames):
+def populate_ki_sessions(segmented_files, filenames):
     datapoints = []
-    for experiment, (segments, filename) in enumerate(zip(segmented_files, filenames)):
+    for session, (segments, filename) in enumerate(zip(segmented_files, filenames)):
         individual, group, axis, saccade = KI_FILENAME_REGEX.findall(filename)[0]
         datapoints.append(Signature(
             x=[s.values for s in segments],
             y=KI_LABELS[group],
             z=int(individual),
-            r=experiment,
+            r=session,
             a=KI_AXIS[axis],
             s=KI_SACCADE[saccade],
             g=KI_LABELS[group],
@@ -232,7 +242,7 @@ def test():
 
     processor = Leif(config)
 
-    ds = KIDataset(data_processor=processor, train=True, bundle_as_experiments=False, use_triplets=False,
+    ds = KIDataset(data_processor=processor, train=True, bundle_as_sessions=False, use_triplets=False,
                    exclude=['vert'])
     binarize(ds)
 
