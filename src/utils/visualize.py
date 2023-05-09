@@ -5,6 +5,8 @@ from matplotlib import pyplot as plt
 from numpy import median
 from pandas import DataFrame
 from scipy.stats import median_absolute_deviation
+from sklearn.manifold import TSNE
+from sklearn.metrics import ConfusionMatrixDisplay
 from torch import Tensor, logical_and
 
 from utils.data import normalize
@@ -150,10 +152,6 @@ def plot_inter_saccade(dataframe: DataFrame):
     # Highlight from anchor 2 - 440 data points to anchor 2
     ax.axvspan(dataframe['Time (s)'][anchors[2] - 440], dataframe['Time (s)'][anchors[2]], alpha=0.2, color='black')
 
-    # Highlight from 1000 ms after anchor 1 to anchor 2
-    # ax.axvspan(dataframe['Time (ms)'][anchors[1]] + 1000, dataframe['Time (ms)'][anchors[2]], alpha=0.2, color='black')
-    # Plot a horizontal line at three standard deviations above the mean
-    # ax.axhline(dataframe['position'].mean() + 3 * dataframe['position'].std(), color='r', linestyle='--')
     # ax.set_title('Antisaccade Session Data')
     ax.set_title('Fixation Period')
     ax.set_xlabel('Time (s)')
@@ -182,3 +180,50 @@ def plot_trial(mts):
     plt.tight_layout()
     fig.savefig(figure_path.joinpath('trial_data.svg'), format='svg', dpi=1200)
     plt.show()
+
+
+def plot_confusion_matrix(labels, predictions, class_names, title='Confusion Matrix', filename='', show=True):
+    """
+    Plot a confusion matrix from a list of labels and predictions
+
+    :param labels: The true labels
+    :param predictions: The predicted labels
+    :param class_names: The names of the classes
+    :param title: The title of the plot
+    :param filename: The filename to save the plot to. The plot will be saved as an svg.
+    :param show: Whether to show the plot
+    :return: The figure
+    """
+    figure = ConfusionMatrixDisplay.from_predictions(labels, predictions, display_labels=class_names, cmap='Blues')
+    figure.ax_.set_title(title)
+    figure.figure_.set_size_inches(4, 3)
+    plt.tight_layout()
+    if len(filename):
+        figure.figure_.savefig(f'{figure_path.joinpath(filename)}.svg', format='svg', dpi=1200)
+    if show:
+        plt.show()
+
+    return figure
+
+
+def plot_latent_neighborhood(features, batch, class_names, filename='', show=False):
+    """
+    Plot a 2d TSNE embedding of the features computed from the batch
+    :param features: The high dimensional features from the model
+    :param batch: The batch of data from which the features were computed
+    :param class_names: The names of the classes in the dataset
+    :param filename: The filename to save the plot to. If a filename is provided, the plot will be saved as an svg.
+    :param show: Whether to show the plot.
+    """
+    tsne = TSNE(n_components=2, perplexity=70)
+    manifold = tsne.fit_transform(features.detach())
+    fig, _ = separate_latent_space_by_attr(manifold, batch.y, batch.s, class_names, SACCADE.keys(),
+                                           title='Latent Representation of Test Set')
+
+    fig, ax = visualize_latent_space(manifold, batch.y, class_names, show=False,
+                                     title='Latent Representation of Test Set')
+    plt.tight_layout()
+    if len(filename):
+        fig.savefig(f'{figure_path.joinpath(filename)}.svg', format='svg', dpi=1200)
+    if show:
+        plt.show()

@@ -1,4 +1,5 @@
 import random
+from warnings import filterwarnings
 
 import numpy as np
 import torch.random
@@ -33,3 +34,8 @@ def initialize_weights(m):
     elif isinstance(m, nn.Linear):
         nn.init.kaiming_uniform_(m.weight.data)
         nn.init.constant_(m.bias.data, 0)
+
+
+def ignore_warnings(*categories):
+    for category in categories:
+        filterwarnings('ignore', category=category)
