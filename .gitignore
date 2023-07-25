@@ -138,6 +138,7 @@ local/
 *.DS_STORE
 *.pth
 *.pkl
+!rocket_instances/*.pkl
 *.docx
 checkpoint/
 log/

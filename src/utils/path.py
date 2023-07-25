@@ -14,6 +14,7 @@ checkpoint_path = root_path.joinpath('checkpoint')
 src_path = root_path.joinpath('src')
 ki_data_tmp_path = ki_data_path.joinpath('tmp')
 figure_path = root_path.joinpath('figure')
+rocket_instances_path = root_path.joinpath('rocket_instances')
 
 
 def walk_of_life(root: str, apply: Callable, file_extension: str, directories: Iterable[str], **kwargs) -> Any:
