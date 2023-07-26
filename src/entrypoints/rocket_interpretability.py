@@ -38,13 +38,13 @@ def main(seed):
     ridge_clf = load(rocket_instances_path.joinpath('rocket_1337_clf.pkl'))
 
     # Batch is entire dataset
-    # train_batch = next(iter(dm.train_dataloader()))
-    # test_batch = next(iter(dm.test_dataloader()))
+    train_batch = next(iter(dm.train_dataloader()))
+    test_batch = next(iter(dm.test_dataloader()))
     val_batch = next(iter(dm.val_dataloader()))
 
     # Perform ROCKET transformation stage on train, val, and test data
-    # train_features = rocket(train_batch.x)
-    # test_features = rocket(test_batch.x)
+    train_features = rocket(train_batch.x)
+    test_features = rocket(test_batch.x)
     val_features = rocket(val_batch.x)
 
     # Make predictions on validation set
