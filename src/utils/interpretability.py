@@ -6,92 +6,92 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.linear_model import (RidgeClassifierCV ,RidgeClassifier)
 from sklearn.preprocessing import StandardScaler
-from sktime.transformations.panel.rocket import (
-    Rocket,
-    MiniRocket,
-    MultiRocket
-)
+# from sktime.transformations.panel.rocket import (
+#     Rocket,
+#     MiniRocket,
+#     MultiRocket
+# )
 
-def train_full_rocket_model(X_train,X_test,y_train,y_test,num_kernels:int = 10000, model_type:str = "rocket", verbose = False):
-    """
-    Applies rocket transformation on time series, fits ridge classifier and evaluates results.
+# def train_full_rocket_model(X_train,X_test,y_train,y_test,num_kernels:int = 10000, model_type:str = "rocket", verbose = False):
+#     """
+#     Applies rocket transformation on time series, fits ridge classifier and evaluates results.
 
-    Parameters
-    ----------
-    X_train: numpy array
-        Training time series, a 3d array of shape (# instances, # dimensions, # timesteps). When used with univariate TS,
-        make sure you transform the 2d to 3d by expanding dimensions
-    X_test: numpy array
-        Test time series, a 3d array of shape (# instances, # dimensions, # timesteps). When used with univariate TS,
-        make sure you transform the 2d to 3d by expanding dimensions
-    y_train: numpy array
-        Training labels
-    y_test: numpy array
-        Test labels
-    num_kernels: int
-        Number of kernels to use
-    model_type: str
-        Type of rocket transformation to use: rocekt, minirocket or multirocket
-    verbose: bool
-        If true, prints the accuraccy results for training and test set
+#     Parameters
+#     ----------
+#     X_train: numpy array
+#         Training time series, a 3d array of shape (# instances, # dimensions, # timesteps). When used with univariate TS,
+#         make sure you transform the 2d to 3d by expanding dimensions
+#     X_test: numpy array
+#         Test time series, a 3d array of shape (# instances, # dimensions, # timesteps). When used with univariate TS,
+#         make sure you transform the 2d to 3d by expanding dimensions
+#     y_train: numpy array
+#         Training labels
+#     y_test: numpy array
+#         Test labels
+#     num_kernels: int
+#         Number of kernels to use
+#     model_type: str
+#         Type of rocket transformation to use: rocekt, minirocket or multirocket
+#     verbose: bool
+#         If true, prints the accuraccy results for training and test set
 
-    Returns
-    -------
-    rocket_model: sktime transformation object
-        ROCKET transformation module
-    classifier: sklearn model
-        Fitted ridge classifier
-    X_train_scaled_transform: numpy array
-        Training features matrix, a 2d array of shape (# instances, # dimensions)
-    X_test_scaled_transform: numpy array
-        Test features matrix, a 2d array of shape (# instances, # dimensions)
-    full_model_score_train: float
-        Balanced accuraccy of the classifier on the training set
-    full_model_score_test: float
-        Balanced accuraccy of the classifier on the test set
-    """
+#     Returns
+#     -------
+#     rocket_model: sktime transformation object
+#         ROCKET transformation module
+#     classifier: sklearn model
+#         Fitted ridge classifier
+#     X_train_scaled_transform: numpy array
+#         Training features matrix, a 2d array of shape (# instances, # dimensions)
+#     X_test_scaled_transform: numpy array
+#         Test features matrix, a 2d array of shape (# instances, # dimensions)
+#     full_model_score_train: float
+#         Balanced accuraccy of the classifier on the training set
+#     full_model_score_test: float
+#         Balanced accuraccy of the classifier on the test set
+#     """
 
-    # Create rocket model
-    if model_type == "rocket":
-        rocket_model = Rocket(num_kernels=num_kernels)
-    elif model_type == "minirocket":
-        rocket_model = MiniRocket(num_kernels=num_kernels)
-    elif model_type == "multirocket":
-        rocket_model = MultiRocket(num_kernels=num_kernels)
-    else:
-        raise ValueError('model_type argument should be one of the following options: (rocekt,minirocket,multirocket)')
+#     # Create rocket model
+#     if model_type == "rocket":
+#         rocket_model = Rocket(num_kernels=num_kernels)
+#     elif model_type == "minirocket":
+#         rocket_model = MiniRocket(num_kernels=num_kernels)
+#     elif model_type == "multirocket":
+#         rocket_model = MultiRocket(num_kernels=num_kernels)
+#     else:
+#         raise ValueError('model_type argument should be one of the following options: (rocekt,minirocket,multirocket)')
 
-    # Fit rocket model
-    rocket_model.fit(X_train)
-    X_train_transform = rocket_model.transform(X_train)
+#     # Fit rocket model
+#     rocket_model.fit(X_train)
+#     X_train_transform = rocket_model.transform(X_train)
 
-    # Scale
-    scaler = StandardScaler(with_mean=True)
-    X_train_scaled_transform = scaler.fit_transform(X_train_transform)
+#     # Scale
+#     scaler = StandardScaler(with_mean=True)
+#     X_train_scaled_transform = scaler.fit_transform(X_train_transform)
 
-    # CV to find best alpha
-    cv_classifier = RidgeClassifierCV(alphas=np.logspace(-10, 10, 20))
-    cv_classifier.fit(X_train_scaled_transform, y_train)
-    full_model_score_train = cv_classifier.score(X_train_scaled_transform, y_train)
-    best_alpha_full = cv_classifier.alpha_
-    if verbose == True:
-        print('Best Alpha:', best_alpha_full)
+#     # CV to find best alpha
+#     cv_classifier = RidgeClassifierCV(alphas=np.logspace(-10, 10, 20))
+#     cv_classifier.fit(X_train_scaled_transform, y_train)
+#     full_model_score_train = cv_classifier.score(X_train_scaled_transform, y_train)
+#     best_alpha_full = cv_classifier.alpha_
+#     if verbose == True:
+#         print('Best Alpha:', best_alpha_full)
 
-    # Refit with all training set
-    classifier = RidgeClassifier(alpha=best_alpha_full)
-    classifier.fit(X_train_scaled_transform, y_train)
-    full_model_score_train = classifier.score(X_train_scaled_transform, y_train)
-    if verbose == True:
-        print('Train Accuraccy:',full_model_score_train)
+#     # Refit with all training set
+#     classifier = RidgeClassifier(alpha=best_alpha_full)
+#     classifier.fit(X_train_scaled_transform, y_train)
+#     full_model_score_train = classifier.score(X_train_scaled_transform, y_train)
+#     if verbose == True:
+#         print('Train Accuraccy:',full_model_score_train)
 
-    # Transform and classify testset
-    X_test_transform = rocket_model.transform(X_test)
-    X_test_scaled_transform = scaler.transform(X_test_transform)
-    full_model_score_test = classifier.score(X_test_scaled_transform, y_test)
-    if verbose == True:
-        print('Test Accuraccy:',full_model_score_test)
+#     # Transform and classify testset
+#     X_test_transform = rocket_model.transform(X_test)
+#     X_test_scaled_transform = scaler.transform(X_test_transform)
+#     full_model_score_test = classifier.score(X_test_scaled_transform, y_test)
+#     if verbose == True:
+#         print('Test Accuraccy:',full_model_score_test)
 
-    return rocket_model, classifier, X_train_scaled_transform, X_test_scaled_transform, full_model_score_train, full_model_score_test
+#     return rocket_model, classifier, X_train_scaled_transform, X_test_scaled_transform, full_model_score_train, full_model_score_test
 
 def feature_detachment(classifier,
                         X_train:np.ndarray,
@@ -139,7 +139,7 @@ def feature_detachment(classifier,
     mean_vector = X_train.mean(axis=0)
     zeros_vector = np.zeros_like(mean_vector)
     nomalized_condition = np.isclose(mean_vector, zeros_vector,atol=1e-02)
-    # assert all(nomalized_condition), "The feature matrix should be normalized before training classifier."
+    assert all(nomalized_condition), "The feature matrix should be normalized before training classifier."
 
     # Alpha and feature importance from full model
     aplha_value = classifier.alpha
