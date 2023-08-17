@@ -2,10 +2,11 @@
 This file contains utilities related to the feature selection and interpretability of the ROCKET model.
 """
 
-import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.linear_model import (RidgeClassifierCV ,RidgeClassifier)
-from sklearn.preprocessing import StandardScaler
+import numpy as np
+from sklearn.linear_model import (RidgeClassifierCV, RidgeClassifier)
+
+
 # from sktime.transformations.panel.rocket import (
 #     Rocket,
 #     MiniRocket,
@@ -94,13 +95,13 @@ from sklearn.preprocessing import StandardScaler
 #     return rocket_model, classifier, X_train_scaled_transform, X_test_scaled_transform, full_model_score_train, full_model_score_test
 
 def feature_detachment(classifier,
-                        X_train:np.ndarray,
-                        X_test:np.ndarray,
-                        y_train:np.ndarray,
-                        y_test:np.ndarray,
-                        drop_percentage: float = 0.05,
-                        total_number_steps: int = 150,
-                        verbose = True):
+                       X_train: np.ndarray,
+                       X_test: np.ndarray,
+                       y_train: np.ndarray,
+                       y_test: np.ndarray,
+                       drop_percentage: float = 0.05,
+                       total_number_steps: int = 150,
+                       verbose=True):
     """
     Applies Sequential Feature Detachment (SFD) to a feature matrix.
 
@@ -138,15 +139,15 @@ def feature_detachment(classifier,
     # Check if training set is normalized
     mean_vector = X_train.mean(axis=0)
     zeros_vector = np.zeros_like(mean_vector)
-    nomalized_condition = np.isclose(mean_vector, zeros_vector,atol=1e-02)
+    nomalized_condition = np.isclose(mean_vector, zeros_vector, atol=1e-02)
     assert all(nomalized_condition), "The feature matrix should be normalized before training classifier."
 
     # Alpha and feature importance from full model
     aplha_value = classifier.alpha
-    feature_importance_full = np.abs(classifier.coef_)[0,:]
+    feature_importance_full = np.abs(classifier.coef_)[0, :]
 
     # Define percentage vector
-    keep_percentage = 1-drop_percentage
+    keep_percentage = 1 - drop_percentage
     powers_vector = np.arange(total_number_steps)
     percentage_vector = np.power(keep_percentage, powers_vector)
 
@@ -154,53 +155,54 @@ def feature_detachment(classifier,
     score_list_train = []
     score_list_test = []
     feature_importance = np.copy(feature_importance_full)
-    feature_importance_matrix = np.zeros((len(percentage_vector),len(feature_importance_full)))
-    feature_selection_matrix = np.full((len(percentage_vector),len(feature_importance_full)), False)
+    feature_importance_matrix = np.zeros((len(percentage_vector), len(feature_importance_full)))
+    feature_selection_matrix = np.full((len(percentage_vector), len(feature_importance_full)), False)
 
     # Begin iterative feature selection
     for count, per in enumerate(percentage_vector):
 
         # Cumpute mask for selected features
         drop_percentage = 1 - per
-        limit_value = np.quantile(feature_importance,drop_percentage)
+        limit_value = np.quantile(feature_importance, drop_percentage)
         selection_mask = feature_importance >= limit_value
 
         # Apply mask
-        X_train_subsampled = X_train[:,selection_mask]
-        X_test_subsampled = X_test[:,selection_mask]
+        X_train_subsampled = X_train[:, selection_mask]
+        X_test_subsampled = X_test[:, selection_mask]
 
         # Train model for selected features
         step_classifier = RidgeClassifier(alpha=aplha_value)
         step_classifier.fit(X_train_subsampled, y_train)
 
         # Compute scores for train and test sets
+        # TODO add option to compute the non-balanced accuracy
         avg_score_train = step_classifier.score(X_train_subsampled, y_train)
         avg_score_test = step_classifier.score(X_test_subsampled, y_test)
         score_list_train.append(avg_score_train)
         score_list_test.append(avg_score_test)
 
         # Save current feature importance and selected features
-        feature_importance_matrix[count,:] = feature_importance
-        feature_selection_matrix[count,:] = selection_mask
+        feature_importance_matrix[count, :] = feature_importance
+        feature_selection_matrix[count, :] = selection_mask
 
         # Kill masked features
         feature_importance[~selection_mask] = 0
-        feature_importance[selection_mask] = np.abs(step_classifier.coef_)[0,:]
+        feature_importance[selection_mask] = np.abs(step_classifier.coef_)[0, :]
 
-        if verbose==True:
-            print("Step {} out of {}".format(count+1, total_number_steps))
-            print('{:.3f}% of features used'.format(100*per))
+        if verbose:
+            print("Step {} out of {}".format(count + 1, total_number_steps))
+            print('{:.3f}% of features used'.format(100 * per))
 
-    return percentage_vector, np.asarray(score_list_train), np.asarray(score_list_test), feature_importance_matrix
+    return percentage_vector, np.asarray(score_list_train), np.asarray(
+        score_list_test), feature_importance_matrix, feature_selection_matrix
 
 
 def select_optimal_model(percentage_vector,
-                            acc_test,
-                            full_model_score_test,
-                            acc_size_tradeoff_coef: float=0.1,
-                            smoothing_points: int = 3,
-                            graphics = True):
-
+                         acc_test,
+                         full_model_score_test,
+                         acc_size_tradeoff_coef: float = 0.1,
+                         smoothing_points: int = 3,
+                         graphics=True):
     """
     Function that selects the optimal model size after SFD process.
 
@@ -228,15 +230,15 @@ def select_optimal_model(percentage_vector,
     """
 
     # Create model percentage vector
-    x_vec = (1-percentage_vector)
+    x_vec = (1 - percentage_vector)
 
     # Create smoothed relative test acc vector
-    y_vec = (acc_test/full_model_score_test)
-    box = np.ones(smoothing_points)/smoothing_points
+    y_vec = (acc_test / full_model_score_test)
+    box = np.ones(smoothing_points) / smoothing_points
     y_vec_smooth = np.convolve(y_vec, box, mode='same')
 
     # Define the functio to optimize
-    optimality_curve = acc_size_tradeoff_coef*x_vec+y_vec_smooth
+    optimality_curve = acc_size_tradeoff_coef * x_vec + y_vec_smooth
 
     # Compute max of the function
     max_index = np.argmax(optimality_curve)
@@ -245,11 +247,11 @@ def select_optimal_model(percentage_vector,
 
     # Plot results
     if graphics == True:
-        margin = int((smoothing_points)/2)
-        plt.plot(x_vec,y_vec, label='Relative test accuracy')
-        plt.plot(x_vec[margin:-margin],optimality_curve[margin:-margin], label='Function to optimize')
-        plt.scatter(max_x_vec,optimality_curve[max_index],c='C2', label='Maximum')
-        plt.scatter(max_x_vec,y_vec[max_index],c='C3', label='Selected value')
+        margin = int((smoothing_points) / 2)
+        plt.plot(x_vec, y_vec, label='Relative test accuracy')
+        plt.plot(x_vec[margin:-margin], optimality_curve[margin:-margin], label='Function to optimize')
+        plt.scatter(max_x_vec, optimality_curve[max_index], c='C2', label='Maximum')
+        plt.scatter(max_x_vec, y_vec[max_index], c='C3', label='Selected value')
         plt.legend()
         plt.ylabel('Relative Classification Accuracy')
         plt.xlabel('% of features Dropped')
@@ -267,8 +269,7 @@ def retrain_optimal_model(feature_importance_matrix,
                           full_model_score_test,
                           original_best_alpha,
                           max_index,
-                          verbose = True):
-
+                          verbose=True):
     """
     Function that retrains a classifier with the optimal subset of selected features.
 
@@ -309,9 +310,9 @@ new_alpha_classifier, new_alpha_acc_train, new_alpha_acc_test, old_alpha_classif
         Balanced accuracy on the test set with old_alpha_acc_train
     """
 
-    feature_mask = feature_importance_matrix[max_index]>0
-    masked_X_train = X_train_scaled_transform[:,feature_mask]
-    masked_X_test= X_test_scaled_transform[:,feature_mask]
+    feature_mask = feature_importance_matrix[max_index] > 0
+    masked_X_train = X_train_scaled_transform[:, feature_mask]
+    masked_X_test = X_test_scaled_transform[:, feature_mask]
 
     # REFIT WITH NEW ALPHA
 
@@ -340,24 +341,24 @@ new_alpha_classifier, new_alpha_acc_train, new_alpha_acc_test, old_alpha_classif
     old_alpha_classifier.score(masked_X_test, y_test)
     old_alpha_acc_test = old_alpha_classifier.score(masked_X_test, y_test)
 
-    if verbose==True:
-        print('Full model train ACC: {:.2f}%'.format(100*full_model_score_train))
-        print('Full model test ACC: {:.2f}%'.format(100*full_model_score_test))
+    if verbose == True:
+        print('Full model train ACC: {:.2f}%'.format(100 * full_model_score_train))
+        print('Full model test ACC: {:.2f}%'.format(100 * full_model_score_test))
         print(' ')
         print('------------')
         print(' ')
         print('RESULTS WITH NEW ALPHA RESULTS:')
         print('New Best Alpha: ', best_alpha_full)
         print(' ')
-        print('Train Accuraccy: {:.2f}%'.format(100*new_alpha_acc_train))
-        print('Test Accuraccy: {:.2f}%'.format(100*new_alpha_acc_test))
+        print('Train Accuraccy: {:.2f}%'.format(100 * new_alpha_acc_train))
+        print('Test Accuraccy: {:.2f}%'.format(100 * new_alpha_acc_test))
         print(' ')
         print('------------')
         print(' ')
         print('RESULTS WITH ORIGINAL ALPHA RESULTS:')
         print('Original Best Alpha:', original_best_alpha)
         print(' ')
-        print('Train Accuraccy: {:.2f}%'.format(100*old_alpha_acc_train))
-        print('Test Accuraccy: {:.2f}%'.format(100*old_alpha_acc_test))
+        print('Train Accuraccy: {:.2f}%'.format(100 * old_alpha_acc_train))
+        print('Test Accuraccy: {:.2f}%'.format(100 * old_alpha_acc_test))
 
     return new_alpha_classifier, new_alpha_acc_train, new_alpha_acc_test, old_alpha_classifier, old_alpha_acc_train, old_alpha_acc_test
