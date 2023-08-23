@@ -10,7 +10,7 @@
 * Use explicit import statements e.g. `from torch.utils.data import Dataset`
     * Exceptions are short and common import statements like `numpy as np`, `torch`, `pandas as pd`,
       `matplotlib.pyplot as plt`, etc.
-* Always optimize statements before pushing
+* Always optimize imports before pushing
     * In pycharm this can be mapped to ctrl+s at `File | Settings | Tools | Actions on Save`
 
 ### Strings
@@ -23,7 +23,7 @@
 
 * Always use type hinting
 * All auxiliary arguments should be keyword arguments
-  (If default value is undesired then use `foo(bar, *, baz)` to make baz keyword argument)
+  (If default value is undesired then use `foo(bar, *, baz)` to make baz a required keyword argument w/o default value)
 * When passing arguments to a callable, if there are many arguments, provide each arg on a new line for improved
   readability. i.e.
 

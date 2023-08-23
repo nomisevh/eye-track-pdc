@@ -1,5 +1,5 @@
 """
-This filename defines the paths to various resources in the project, as well as some related tools.
+This file defines the paths to various resources in the project, as well as some related tools.
 """
 import os
 from pathlib import Path

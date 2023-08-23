@@ -96,7 +96,8 @@ def main(seed, correct_way=True, use_cached_features=True):
                 train_features,
                 val_features,
                 train_labels,
-                val_labels)
+                val_labels,
+                total_number_steps=175)
 
         optimal_index, optimal_percentage = select_optimal_model(percentage_vector, score_list_val, score_list_val[0])
 
@@ -139,23 +140,29 @@ def compare_kernel_distributions(kernels, feature_selection):
 
     # Histogram the distribution of kernel dilation
     kept_dilation = [k.dilation[0] for k in kept_kernels]
-    discarded_dilation = [k.dilation[0] for k in discarded_kernels]
-    hist_kernel_property(kept_dilation, discarded_dilation, 'Dilation')
+    all_dilation = [k.dilation[0] for k in kernels]
+    hist_kernel_property(kept_dilation, all_dilation, 'Dilation')
 
     # Do the same for kernel length
     kept_len = [k.weight.shape[-1] for k in kept_kernels]
-    discarded_len = [k.weight.shape[-1] for k in discarded_kernels]
-    hist_kernel_property(kept_len, discarded_len, 'Length')
+    all_len = [k.weight.shape[-1] for k in kernels]
+    hist_kernel_property(kept_len, all_len, 'Length')
 
     # And the bias
     kept_bias = [k.bias.item() for k in kept_kernels]
-    discarded_bias = [k.bias.item() for k in discarded_kernels]
-    hist_kernel_property(kept_bias, discarded_bias, 'Bias')
+    all_bias = [k.bias.item() for k in kernels]
+    hist_kernel_property(kept_bias, all_bias, 'Bias')
+
+    # Receptive field
+    kept_rf = [k.dilation[0] * k.weight.shape[-1] for k in kept_kernels]
+    all_rf = [k.dilation[0] * k.weight.shape[-1] for k in kernels]
+    hist_kernel_property(kept_rf, all_rf, 'Receptive Field')
 
 
-def hist_kernel_property(kept_kernels_prop, discarded_kernels_prop, prop_name):
+def hist_kernel_property(kept_kernels_prop, all_kernels_prop, prop_name):
     fig, ax = plt.subplots()
-    ax.hist([kept_kernels_prop, discarded_kernels_prop], bins='doane', label=['Kept', 'Discarded'], density=True)
+    # Todo there is some problem with Doane binning, which results in the histogram not summing to 1.
+    ax.hist([kept_kernels_prop, all_kernels_prop], bins='doane', label=['Kept', 'All Kernels'], density=True)
     ax.legend(loc='upper right')
     ax.set_title(f"Kernel {prop_name}")
     ax.set_xlabel("Value")
