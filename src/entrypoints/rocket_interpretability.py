@@ -127,9 +127,9 @@ def main(seed, correct_way=True, use_cached_features=True):
 
 def compare_kernel_distributions(kernels, feature_selection):
     # Reshape by kernel, there are 2 features per kernel
-    feature_selection = feature_selection.reshape((2, -1))  # (2, num_kernels)
+    feature_selection = feature_selection.reshape((-1, 2))  # (num_kernels, 2)
     # Keep all kernels where at least one attribute was selected
-    keep_mask = feature_selection.any(axis=0)
+    keep_mask = feature_selection.any(axis=1)
     kept_kernels = nn.ModuleList()
     discarded_kernels = nn.ModuleList()
     for kernel, keep in zip(kernels, keep_mask):
