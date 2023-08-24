@@ -4,6 +4,7 @@ Interprets the kernels and classifier weights of the ROCKET model and its ridge 
 This file loads the best ROCKET model and its classifier, and computes feature importance based on Sequential Feature
 Detachment. The optimal selection of kernels is then analyzed based on the kernel dilation and length.
 """
+import types
 
 import numpy as np
 import torch
@@ -14,6 +15,7 @@ from torch import nn
 from yaml import FullLoader, load as load_yaml
 
 from datamodule import KIDataModule
+from models.rocket import dissected_forward
 from utils.interpretability import feature_detachment, select_optimal_model, retrain_optimal_model
 from utils.misc import set_random_state
 from utils.path import config_path, rocket_instances_path
@@ -168,6 +170,42 @@ def hist_kernel_property(kept_kernels_prop, all_kernels_prop, prop_name):
     ax.set_xlabel("Value")
     ax.set_ylabel("Frequency")
     plt.show()
+
+
+def dissect_rocket_transformation_stage(x, y, pred, rocket, n=5):
+    """
+    Dissect the rocket transformation stage by visualizing the output from the convolution op. alongside the input for
+    all samples in x.
+    :param x: A tensor holding the input signal of shape (N, M, T).
+    :param y: A tensor holding the targets for the input (N).
+    :param pred: A tensor holding the predictions for the input (N).
+    :param rocket: The rocket model to be used.
+    :param n: The number of datapoints to visualize, the first n correctly predicted datapoints from the test set will
+        be used.
+    """
+    # Overwrite the forward pass to also provide the output signal before computing PPV and Max
+    rocket.forward = types.MethodType(dissected_forward, rocket)
+    features, out_signal = rocket(x)  # Output is shape (N, T)
+
+    # Find the first n correctly predicted data
+
+    # For every such datapoint, visualize the convolution and stack them horizontally in figure.
+
+    # Add title and a common legend for all subplots.
+
+
+def visualize_convolution(x, output_signal, ax):
+    """
+    Visualize the various dims of an input series and the output from the rocket convolution operation
+    :param x: A tensor holding the input signal of shape (M, T).
+    :param output_signal: The output signal from the convolution of shape (T)
+    :param ax: The matplotlib axis to plot on.
+    """
+    # Plot the input dimensions in thin lines with low alpha (so they appear as background)
+
+    # Plot the output signal with a thicker line on top (foreground)
+
+    ...
 
 
 if __name__ == '__main__':

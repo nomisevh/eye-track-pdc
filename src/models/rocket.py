@@ -57,3 +57,20 @@ class ROCKET(nn.Module):
         if self.normalize:
             return normalize_tensor(out)
         return out
+
+
+def dissected_forward(self, x):
+    _output = []
+    _output_ts = []
+    for i in tqdm(range(self.n_kernels), disable=not self.verbose, leave=False, desc='kernel/kernels'):
+        out = self.convs[i](x.float())
+        _max = out.max(dim=-1)[0]
+        _ppv = torch.gt(out, 0).sum(dim=-1).float() / out.shape[-1]
+        _output.append(_max)
+        _output.append(_ppv)
+        _output_ts.append(out)
+    out = torch.cat(_output, dim=1)
+    out_ts = torch.cat(_output_ts, dim=1)
+    if self.normalize:
+        return normalize_tensor(out)
+    return out, out_ts
