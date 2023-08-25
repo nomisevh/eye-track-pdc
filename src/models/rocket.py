@@ -70,7 +70,10 @@ def dissected_forward(self, x):
         _output.append(_ppv)
         _output_ts.append(out)
     out = torch.cat(_output, dim=1)
+    # TODO for now trimming from the front to ensure all ts are the same length, but still end at the stimuli
+    min_ts_length = min(t.shape[2] for t in _output_ts)
+    _output_ts = [t[:, :, -min_ts_length:] for t in _output_ts]
     out_ts = torch.cat(_output_ts, dim=1)
     if self.normalize:
-        return normalize_tensor(out)
+        return normalize_tensor(out), out_ts
     return out, out_ts
