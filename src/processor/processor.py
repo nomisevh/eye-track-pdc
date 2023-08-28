@@ -10,7 +10,7 @@ from torch import inf
 from tqdm import tqdm
 
 from processor.interface import MainProcessor, BatchProcessor, Scissor
-from utils.data import ZScoreMask
+from utils.data import ZScoreMask, butter_highpass_filter
 from utils.ki import SAMPLE_RATE, INVISIBLE_TARGET_DURATION
 
 
@@ -29,6 +29,11 @@ class Leif(MainProcessor):
         else:
             raise NotImplementedError(f'Normalization method {normalization_method} not implemented.')
 
+        freq_filter_config = config.get('frequency_filter')
+        self.freq_filter = None
+        if freq_filter_config is not None:
+            self.freq_filter = FrequencyFilter(**freq_filter_config, sample_rate=SAMPLE_RATE)
+
         self.scissor = FocusScissor(sample_rate=SAMPLE_RATE, invisible_target_duration=INVISIBLE_TARGET_DURATION,
                                     **config['segmentation'])
         self.channels = config['channels']
@@ -39,6 +44,9 @@ class Leif(MainProcessor):
 
         # Normalize files
         frames = self.file_normalizer(frames)
+
+        if self.freq_filter is not None:
+            self.freq_filter(frames)
 
         # For each file/trial:
         trials, min_segment_length = [], inf
@@ -194,6 +202,21 @@ class FileFilter(BatchProcessor):
         self.mask = keep
         print(f'skipped {(~keep).sum()} files in total')
 
+        return frames
+
+
+class FrequencyFilter(BatchProcessor):
+    CHANNELS = ["position", "drift", "position_diff", "drift_diff"]
+
+    def __init__(self, cutoff, sample_rate, order=6):
+        self.cutoff = cutoff
+        self.sample_rate = sample_rate
+        self.order = order
+
+    def __call__(self, frames: List[DataFrame], **kwargs) -> List[DataFrame]:
+        for df in frames:
+            for ch in self.CHANNELS:
+                df[ch] = butter_highpass_filter(df[ch], cutoff=self.cutoff, fs=self.sample_rate, order=self.order)
         return frames
 
 

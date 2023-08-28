@@ -34,6 +34,10 @@ segmentation:
   # 'only' means that only the part where the target is invisible is included in the segment.
   # invisible_target_mode: exclude
 
+frequency_filter:
+  cutoff: 18
+  order: 12
+
 # The channels to include in the dataset
 channels:
   - position

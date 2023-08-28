@@ -13,8 +13,9 @@ from yaml import load as load_yaml, FullLoader
 from processor.interface import MainProcessor
 from processor.processor import Leif
 from utils.data import binarize
+from utils.interpretability import compute_average_power_spectrum, plot_power_spectrum
 from utils.ki import LABELS as KI_LABELS, FILENAME_REGEX as KI_FILENAME_REGEX, AXIS as KI_AXIS, SACCADE as KI_SACCADE, \
-    load_data
+    load_data, SAMPLE_RATE
 from utils.misc import torch_unique_index
 from utils.path import ki_data_tmp_path, config_path
 from utils.visualize import plot_trial
@@ -245,6 +246,12 @@ def test():
     ds = KIDataset(data_processor=processor, train=True, bundle_as_sessions=False, use_triplets=False,
                    exclude=['vert'])
     binarize(ds)
+
+    list_of_arrays = [t.x[0].numpy() for t in ds if t.y == 1]
+
+    avg_power_spectrum, center_freq = compute_average_power_spectrum(list_of_arrays, SAMPLE_RATE, 30)
+
+    plot_power_spectrum(center_freq, avg_power_spectrum)
 
     example = ds[0]
 

@@ -1,5 +1,6 @@
 import numpy as np
 from numpy import median, logical_or
+from scipy.signal import butter, filtfilt
 from scipy.stats import zscore, median_absolute_deviation
 
 
@@ -43,3 +44,16 @@ def normalize(x):
     x -= m
     x /= s
     return x
+
+
+def butter_highpass(cutoff, fs, order):
+    nyq = 0.5 * fs
+    normal_cutoff = cutoff / nyq
+    b, a = butter(order, normal_cutoff, btype='high', analog=False, output='ba')
+    return b, a
+
+
+def butter_highpass_filter(data, cutoff, fs, order):
+    b, a = butter_highpass(cutoff, fs, order=order)
+    y = filtfilt(b, a, data)
+    return y
