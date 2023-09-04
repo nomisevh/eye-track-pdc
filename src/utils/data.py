@@ -38,9 +38,11 @@ def binarize(dataset):
     dataset.y[dataset.y != 0] = 1
 
 
-def normalize(x):
-    m = x.mean(0, keepdim=True)
-    s = x.std(0, unbiased=False, keepdim=True)
+def normalize(x, m=None, s=None):
+    if m is None:
+        m = x.mean(0, keepdim=True)
+    if s is None:
+        s = x.std(0, unbiased=False, keepdim=True)
     x -= m
     x /= s
     return x

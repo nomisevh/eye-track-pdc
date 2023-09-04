@@ -41,6 +41,7 @@ def main(seed):
 
     # Perform ROCKET transformation stage on train and test data
     train_features = rocket(train_batch.x)
+    rocket.train = False
     test_features = rocket(test_batch.x)
 
     # Fit classifier to the rocket features

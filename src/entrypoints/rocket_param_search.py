@@ -47,6 +47,8 @@ def main():
 
             # Perform ROCKET transformation stage on train and eval data
             train_features = rocket(train_batch.x)
+            # Set to eval mode, as to use statistics from train batch for normalization
+            rocket.train = False
             eval_features = rocket(eval_batch.x)
 
             clf.fit(train_features, train_batch.y)

@@ -44,6 +44,9 @@ class ROCKET(nn.Module):
         self.verbose = verbose
         self.normalize = normalize
         self.out_dim = 2 * n_kernels
+        self.train = True
+        self.mean = 0
+        self.std = 0.01
 
     def forward(self, x):
         _output = []
@@ -55,7 +58,9 @@ class ROCKET(nn.Module):
             _output.append(_ppv)
         out = torch.cat(_output, dim=1)
         if self.normalize:
-            return normalize_tensor(out)
+            if self.train:
+                self.mean, self.std = out.mean(0, keepdim=True), out.std(0, unbiased=False, keepdim=True)
+            return normalize_tensor(out, self.mean, self.std)
         return out
 
 
