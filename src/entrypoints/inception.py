@@ -12,7 +12,7 @@ from utils.eval import evaluate
 from utils.misc import set_random_state, ignore_warnings
 from utils.path import config_path, log_path, checkpoint_path
 
-TAGS = ['Final Results', 'Main Results v3']
+TAGS = ['Final Results', 'Main Results v3', 'High Pass 20Hz']
 CHECKPOINT_FILENAME = 'PDC-378-epoch=18.ckpt'
 
 

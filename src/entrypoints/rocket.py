@@ -33,7 +33,7 @@ def main(seed):
                     **rocket_config)
 
     # Initialize Classifiers
-    ridge_clf = RidgeClassifier(alpha=1e4, random_state=SEED)
+    ridge_clf = RidgeClassifier(alpha=1e3, random_state=SEED)
 
     # Batch is entire dataset
     train_batch = next(iter(dm.train_dataloader()))

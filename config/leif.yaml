@@ -35,8 +35,8 @@ segmentation:
   # invisible_target_mode: exclude
 
 frequency_filter:
-  cutoff: 18
-  order: 12
+  cutoff: 20
+  order: 8
 
 # The channels to include in the dataset
 channels:
