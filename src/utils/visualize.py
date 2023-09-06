@@ -172,7 +172,7 @@ def plot_trial(mts):
     ax.plot(x, y[1], label='gaze y', linewidth=1)
     ax.plot(x, y[2], label='gaze x vel', linewidth=1, c='brown')
     ax.plot(x, y[3], label='gaze y vel', linewidth=1, c='purple')
-    ax.set_ylim(-0.3, 0.3)
+    ax.set_ylim(-0.1, 0.1)
     ax.set_title('Trial Data')
     ax.set_xlabel('Step')
     ax.set_ylabel('Gaze Position (a.u.)')
@@ -215,7 +215,7 @@ def plot_latent_neighborhood(features, batch, class_names, filename='', show=Fal
     :param filename: The filename to save the plot to. If a filename is provided, the plot will be saved as an svg.
     :param show: Whether to show the plot.
     """
-    tsne = TSNE(n_components=2, perplexity=70)
+    tsne = TSNE(n_components=2, perplexity=30)
     manifold = tsne.fit_transform(features.detach())
     fig, _ = separate_latent_space_by_attr(manifold, batch.y, batch.s, class_names, SACCADE.keys(),
                                            title='Latent Representation of Test Set')
