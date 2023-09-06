@@ -54,8 +54,10 @@ class ROCKET(nn.Module):
             out = self.convs[i](x.float())
             _max = out.max(dim=-1)[0]
             _ppv = torch.gt(out, 0).sum(dim=-1).float() / out.shape[-1]
-            _output.append(_max)
-            _output.append(_ppv)
+            if not hasattr(self.convs[i], 'use_features') or self.convs[i].use_features[0]:
+                _output.append(_max)
+            if not hasattr(self.convs[i], 'use_features') or self.convs[i].use_features[1]:
+                _output.append(_ppv)
         out = torch.cat(_output, dim=1)
         if self.normalize:
             if self.train:
