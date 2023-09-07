@@ -172,7 +172,7 @@ def plot_trial(mts):
     ax.plot(x, y[1], label='gaze y', linewidth=1)
     ax.plot(x, y[2], label='gaze x vel', linewidth=1, c='brown')
     ax.plot(x, y[3], label='gaze y vel', linewidth=1, c='purple')
-    ax.set_ylim(-0.3, 0.3)
+    ax.set_ylim(-0.1, 0.1)
     ax.set_title('Trial Data')
     ax.set_xlabel('Step')
     ax.set_ylabel('Gaze Position (a.u.)')

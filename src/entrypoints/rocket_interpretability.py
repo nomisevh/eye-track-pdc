@@ -9,6 +9,8 @@ import types
 import matplotlib.colors as m_colors
 import numpy as np
 import torch
+import os
+
 from joblib import load
 from matplotlib import pyplot as plt
 from sklearn.metrics import balanced_accuracy_score
@@ -19,7 +21,7 @@ from datamodule import KIDataModule
 from models.rocket import dissected_forward
 from utils.interpretability import feature_detachment, select_optimal_model, retrain_optimal_model
 from utils.misc import set_random_state
-from utils.path import config_path, rocket_instances_path, figure_path
+from utils.path import config_path, rocket_instances_path, figure_path, ki_data_tmp_path
 
 
 def main(seed, correct_way=True, use_cached_features=True):
