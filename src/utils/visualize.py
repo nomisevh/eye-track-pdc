@@ -215,7 +215,7 @@ def plot_latent_neighborhood(features, batch, class_names, filename='', show=Fal
     :param filename: The filename to save the plot to. If a filename is provided, the plot will be saved as an svg.
     :param show: Whether to show the plot.
     """
-    tsne = TSNE(n_components=2, perplexity=70)
+    tsne = TSNE(n_components=2, perplexity=30)
     manifold = tsne.fit_transform(features.detach())
     fig, _ = separate_latent_space_by_attr(manifold, batch.y, batch.s, class_names, SACCADE.keys(),
                                            title='Latent Representation of Test Set')

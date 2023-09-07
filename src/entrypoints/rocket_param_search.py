@@ -39,7 +39,7 @@ def main():
             # Overwrite InceptionTime config
             rocket = ROCKET(c_in=dm.train_ds.x.shape[1], seq_len=dm.train_ds.x.shape[2], n_kernels=kwargs['n_kernels'],
                             normalize=True)
-            clf = RidgeClassifier(alpha=kwargs['alpha'], random_state=SEED)
+            clf = RidgeClassifier(alpha=kwargs['alpha'])
 
             # Train and test batches are entire dataset
             train_batch = next(iter(dm.train_dataloader()))

@@ -1,16 +1,18 @@
+import pickle
+
+import torch
 from sklearn.linear_model import RidgeClassifier
 from torch import tensor
 from yaml import FullLoader, load as load_yaml
 
 from datamodule import KIDataModule
 from models.rocket import ROCKET
-from utils.const import SEED
 from utils.eval import evaluate
 from utils.misc import set_random_state
-from utils.path import config_path
+from utils.path import config_path, rocket_instances_path
 
 
-def main(seed):
+def main(seed, use_pruned_model=False):
     set_random_state(seed)
 
     # Load configs
@@ -28,12 +30,20 @@ def main(seed):
     dm.setup('test')
 
     # Initialize Rocket
-    rocket = ROCKET(c_in=dm.train_ds.x.shape[1],
-                    seq_len=dm.train_ds.x.shape[2],
-                    **rocket_config)
+    if use_pruned_model:
+        # The loaded rocket model has the statistics of all features when normalizing, keep it that way.
+        rocket = torch.load(rocket_instances_path.joinpath(f'pruned_rocket_{seed}.ckpt'))
+    else:
+        rocket = ROCKET(c_in=dm.train_ds.x.shape[1],
+                        seq_len=dm.train_ds.x.shape[2],
+                        **rocket_config)
 
     # Initialize Classifiers
-    ridge_clf = RidgeClassifier(alpha=1e3, random_state=SEED)
+    if use_pruned_model:
+        with open(rocket_instances_path.joinpath(f'pruned_rocket_clf_{seed}.pkl'), 'rb') as reader:
+            ridge_clf = pickle.load(reader)
+    else:
+        ridge_clf = RidgeClassifier(alpha=1e3)
 
     # Batch is entire dataset
     train_batch = next(iter(dm.train_dataloader()))
@@ -59,7 +69,7 @@ def main(seed):
 
 
 if __name__ == '__main__':
-    main(1337)
+    main(2, use_pruned_model=True)
 
     # for seed in [42, 1337, 9000, 1, 2]:
     #     main(seed)

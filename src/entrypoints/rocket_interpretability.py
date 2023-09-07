@@ -4,6 +4,7 @@ Interprets the kernels and classifier weights of the ROCKET model and its ridge 
 This file loads the best ROCKET model and its classifier, and computes feature importance based on Sequential Feature
 Detachment. The optimal selection of kernels is then analyzed based on the kernel dilation and length.
 """
+import pickle
 import types
 
 import matplotlib.colors as m_colors
@@ -13,12 +14,13 @@ import os
 
 from joblib import load
 from matplotlib import pyplot as plt
+from sklearn.linear_model import RidgeClassifier
 from sklearn.metrics import balanced_accuracy_score
 from torch import nn, tensor
 from yaml import FullLoader, load as load_yaml
 
 from datamodule import KIDataModule
-from models.rocket import dissected_forward
+from models.rocket import dissected_forward, ROCKET
 from utils.interpretability import feature_detachment, select_optimal_model, retrain_optimal_model
 from utils.misc import set_random_state
 from utils.path import config_path, rocket_instances_path, figure_path, ki_data_tmp_path
@@ -30,6 +32,8 @@ def main(seed, correct_way=True, use_cached_features=True):
     # Load configs
     with open(config_path.joinpath('leif.yaml')) as reader:
         processor_config = load_yaml(reader, Loader=FullLoader)
+    with open(config_path.joinpath('rocket.yaml')) as reader:
+        rocket_config = load_yaml(reader, Loader=FullLoader)
 
     dm = KIDataModule(processor_config=processor_config,
                       bundle_as_experiments=False,
@@ -39,11 +43,12 @@ def main(seed, correct_way=True, use_cached_features=True):
     dm.setup('fit')
     dm.setup('test')
 
-    # Load best rocket model
-    rocket = torch.load(rocket_instances_path.joinpath(f'rocket_{seed}.ckpt'))
+    # Create the rocket model
+    rocket = ROCKET(c_in=dm.train_ds.x.shape[1],
+                    seq_len=dm.train_ds.x.shape[2],
+                    **rocket_config)
 
-    # Load trained classifier
-    ridge_clf = load(rocket_instances_path.joinpath(f'rocket_{seed}_clf.pkl'))
+    ridge_clf = RidgeClassifier(alpha=1e3)
 
     # Batch is entire dataset
     train_batch = next(iter(dm.train_dataloader()))
@@ -60,14 +65,19 @@ def main(seed, correct_way=True, use_cached_features=True):
         train_features = torch.load(features_filename('train'))
         test_features = torch.load(features_filename('test'))
         val_features = torch.load(features_filename('val'))
+        rocket.train = False
     except FileNotFoundError:
         # Perform ROCKET transformation stage on train, val, and test data
+        rocket.train = True
         train_features = rocket(train_batch.x).numpy()
+        rocket.train = False
         test_features = rocket(test_batch.x).numpy()
         val_features = rocket(val_batch.x).numpy()
         torch.save(train_features, features_filename('train'))
         torch.save(test_features, features_filename('test'))
         torch.save(val_features, features_filename('val'))
+
+    ridge_clf.fit(train_features, train_batch.y)
 
     # Make predictions on validation set
     train_pred = ridge_clf.predict(train_features)
@@ -94,6 +104,7 @@ def main(seed, correct_way=True, use_cached_features=True):
     val_score = balanced_accuracy_score(val_labels, val_pred)
 
     if correct_way:
+        # TODO this comment seems backward
         # CORRECT WAY (train and val are combined)
         percentage_vector, score_list_train, score_list_val, feature_importance_matrix, feature_selection_matrix = \
             feature_detachment(
@@ -141,13 +152,28 @@ def main(seed, correct_way=True, use_cached_features=True):
     # Find the first correctly predicted data point that is HC
     sample_hc_index = torch.logical_and(test_batch.y == tensor(test_pred), test_batch.y == 0).nonzero().squeeze()[0]
 
-    # compare_kernel_distributions(rocket.convs, kept_kernels)
+    compare_kernel_distributions(rocket.convs, kept_kernels)
 
     # Limit the kernels in the rocket model
+    rocket = apply_pruning(rocket, kept_kernels, feature_selection_matrix[optimal_index], feature_selection[keep_mask])
+
+    torch.save(rocket, rocket_instances_path.joinpath(f'pruned_rocket_{seed}.ckpt'))
+    with open(rocket_instances_path.joinpath(f'pruned_rocket_clf_{seed}.pkl'), 'wb') as writer:
+        pickle.dump(retrained_clf[3], writer)
+
+    # Use None indexing to keep dimensionality of x
+    # dissect_rocket_transformation_stage(test_batch.x[sample_pd_index:sample_pd_index + 1], rocket)
+
+
+# This is a mess, will fix later
+def apply_pruning(rocket, kept_kernels, kept_features, features_per_kernel):
     rocket.convs = kept_kernels
     rocket.n_kernels = len(kept_kernels)
-    # Use None indexing to keep dimensionality of x
-    dissect_rocket_transformation_stage(test_batch.x[sample_pd_index:sample_pd_index + 1], rocket)
+    rocket.mean = rocket.mean[:, kept_features]
+    rocket.std = rocket.std[:, kept_features]
+    for features, kernel in zip(features_per_kernel, rocket.convs):
+        kernel.use_features = features
+    return rocket
 
 
 def compare_kernel_distributions(all_kernels, kept_kernels):
@@ -162,9 +188,9 @@ def compare_kernel_distributions(all_kernels, kept_kernels):
     hist_kernel_property(kept_len, all_len, 'Length')
 
     # And the bias
-    kept_bias = [k.bias.item() for k in kept_kernels]
-    all_bias = [k.bias.item() for k in all_kernels]
-    hist_kernel_property(kept_bias, all_bias, 'Bias')
+    # kept_bias = [k.bias.item() for k in kept_kernels]
+    # all_bias = [k.bias.item() for k in all_kernels]
+    # hist_kernel_property(kept_bias, all_bias, 'Bias')
 
     # Receptive field
     kept_rf = [k.dilation[0] * k.weight.shape[-1] for k in kept_kernels]
@@ -241,4 +267,4 @@ def visualize_convolution(x, output_signal, ax, padding):
 
 
 if __name__ == '__main__':
-    main(1337, use_cached_features=True)
+    main(2, use_cached_features=False)
