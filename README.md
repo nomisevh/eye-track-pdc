@@ -28,7 +28,7 @@ conda env update --file conda/[OS].yaml --prune`
 
 ### Datasets
 
-We use a private dataset from the Karolinska Institute for our experiments. For details, see our paper **todo**.
+We use a private dataset for our experiments. For details, see our paper **todo**.
 For access to the data, contact the authors.
 
 ### Logging
@@ -52,7 +52,7 @@ mode: async
 
 📂`data` datasets
 
-&nbsp;&nbsp;┗ 📂`ki`: Karolinska Institute data
+&nbsp;&nbsp;┗ 📂`ki`: Our data
 
 &nbsp;&nbsp;&nbsp;&nbsp;┗ 📂`tmp`: temp folder for cached dataset instances
 
