@@ -145,6 +145,4 @@ log/
 !log/.gitkeep
 config/neptune.yaml
 **/.neptune
-/rocket_instances/rocket_1337_test_features.ckpt
-/rocket_instances/rocket_1337_train_features.ckpt
-/rocket_instances/rocket_1337_val_features.ckpt
+/rocket_instances/*
