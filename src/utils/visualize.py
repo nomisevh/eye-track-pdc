@@ -227,3 +227,297 @@ def plot_latent_neighborhood(features, batch, class_names, filename='', show=Fal
         fig.savefig(f'{figure_path.joinpath(filename)}.svg', format='svg', dpi=1200)
     if show:
         plt.show()
+
+
+def plot_results_bar_chart():
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    # Data from the user's table
+    models = ["ROCKET", "Detach-ROCKET", "InceptionTime", "Brien et al."]
+    levels = ['Trial', 'Subject']
+    trial_std_dev = [2.23, 0.85, 2.84]
+    subject_accuracies = [87.50, 96.25, 77.50, 82.00]
+    subject_std_dev = [4.42, 3.42, 5.59, 6.7]
+    rocket_accuracies = []
+
+    x = np.arange(2)  # the label locations
+    x_trial = np.arange(len(trial_std_dev))
+    x_sub = np.arange(len(subject_std_dev))
+    width = 0.35  # the width of the bars
+
+    # Adjusting the plot to include only Subject Accuracy for "Brien et al."
+    # and improving the aesthetics of the plot as requested
+
+    # Update data to remove Trial Accuracy for "Brien et al."
+    trial_accuracies = [68.04, 73.46, 55.73]  # None for Brien et al.
+
+    # Define colors
+    trial_color = 'blue'
+    subject_color = 'orange'
+
+    # Create a new figure with slightly larger size
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Create bars for Trial Accuracy except for "Brien et al."
+    trial_bars = ax.bar(x_trial - width / 2, trial_accuracies, width, yerr=trial_std_dev,
+                        label='Trial Accuracy', color=trial_color, capsize=5, error_kw={'elinewidth': 2, 'capthick': 2})
+
+    # Create bars for Subject Accuracy
+    subject_bars = ax.bar(x_sub + width / 2, subject_accuracies, width, yerr=subject_std_dev,
+                          label='Subject Accuracy', color=subject_color, capsize=5,
+                          error_kw={'elinewidth': 2, 'capthick': 2})
+
+    # Improve the aesthetics
+    ax.set_xlabel('Classification Level', fontsize=14)
+    ax.set_ylabel('Accuracy (%)', fontsize=14)
+    ax.set_title('Model Accuracy on Trial and Subject Level', fontsize=16)
+    ax.set_xticks(x)
+    ax.set_xticklabels(levels, fontsize=14)
+    ax.legend(fontsize=14)
+
+    # Rotate the tick labels for better readability
+    # plt.setp(ax.get_xticklabels(), rotation=0, horizontalalignment='center')
+
+    # Set the style of the grid
+    ax.yaxis.grid(True, linestyle='--', which='major', color='grey', alpha=.25)
+
+    # Set the background color
+    ax.set_facecolor('white')
+
+    # Remove top and right spines
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    # Create bars with rounded corners for Trial Accuracy
+
+    rocket_bars = ax.bar(x_trial - width / 2, trial_accuracies, width, yerr=trial_std_dev, label='Trial Accuracy',
+                         color=trial_color,
+
+                         capsize=5, error_kw=dict(elinewidth=2, ecolor='black'),
+
+                         align='center', zorder=2)
+
+    # Create bars with rounded corners for Subject Accuracy
+
+    inception_bars = ax.bar(x_sub + width / 2, subject_accuracies, width, yerr=subject_std_dev,
+                            label='Subject Accuracy',
+                            color=subject_color,
+
+                            capsize=5, error_kw=dict(elinewidth=2, ecolor='black'),
+
+                            align='center', zorder=2)
+    detach_bars = ax.bar(x_sub + width / 2, subject_accuracies, width, yerr=subject_std_dev, label='Subject Accuracy',
+                         color=subject_color,
+
+                         capsize=5, error_kw=dict(elinewidth=2, ecolor='black'),
+
+                         align='center', zorder=2)
+    brien_bars = ax.bar(x_sub + width / 2, subject_accuracies, width, yerr=subject_std_dev, label='Subject Accuracy',
+                        color=subject_color,
+
+                        capsize=5, error_kw=dict(elinewidth=2, ecolor='black'),
+
+                        align='center', zorder=2)
+
+    def add_labels(bars):
+        for bar in bars:
+            height = bar.get_height()
+            ax.annotate('{}'.format(round(height, 2)),
+                        xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, -40),  # 3 points vertical offset
+                        textcoords="offset points",
+                        ha='center', va='bottom', fontsize=14)
+
+    # Call the function to add labels
+
+    add_labels(trial_bars)
+
+    add_labels(subject_bars)
+
+    # Set the corner style to round
+
+    for bar in trial_bars:
+        bar.set_capstyle('round')
+
+    for bar in subject_bars:
+        bar.set_capstyle('round')
+
+    # Show the figure with the new style
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_grouped_bar_chart():
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    # Data
+    models = ["ROCKET", "Detach-ROCKET", "InceptionTime", "Brien et al."]
+    trial_accuracies = [68.04, 73.46, 55.73, np.nan]  # NaN for Brien et al.
+    subject_accuracies = [87.50, 96.25, 77.50, 82.00]
+    trial_std_dev = [2.23, 0.85, 2.84, np.nan]  # NaN for Brien et al.
+    subject_std_dev = [4.42, 3.42, 5.59, 6.7]
+
+    # X-axis locations for the groups
+    ind = np.arange(len(models))
+    width = 0.35
+
+    # Create figure and axes
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Plotting bars for Trial and Subject accuracies
+    trial_bars = ax.bar(ind - width / 2, trial_accuracies, width, yerr=trial_std_dev,
+                        label='Trial Accuracy', color='blue', capsize=5)
+    subject_bars = ax.bar(ind + width / 2, subject_accuracies, width, yerr=subject_std_dev,
+                          label='Subject Accuracy', color='orange', capsize=5)
+
+    # Aesthetics
+    ax.set_xlabel('Accuracy Type', fontsize=14)
+    ax.set_ylabel('Accuracy (%)', fontsize=14)
+    ax.set_title('Model Accuracy for Trial and Subject', fontsize=16)
+    ax.set_xticks(ind)
+    ax.set_xticklabels(models, fontsize=14)
+    ax.legend(fontsize=14)
+
+    ax.yaxis.grid(True, linestyle='--', which='major', color='grey', alpha=.25)
+    ax.set_facecolor('white')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def grouped_bar_chart():
+    import pandas as pd
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+
+    # Data provided
+    models = ["ROCKET", "Detach-ROCKET", "InceptionTime", "Brien et al."]
+    trial_accuracies = [68.04, 73.46, 55.73, None]  # None for Brien et al.
+    trial_std_dev = [2.23, 0.85, 2.84, None]
+    subject_accuracies = [87.50, 96.25, 77.50, 82.00]
+    subject_std_dev = [4.42, 3.42, 5.59, 6.7]
+
+    # Creating a DataFrame
+    data = []
+    for model, t_acc, t_std, s_acc, s_std in zip(models, trial_accuracies, trial_std_dev, subject_accuracies,
+                                                 subject_std_dev):
+        data.append({'Model': model, 'Level': 'Trial', 'Accuracy': t_acc, 'StdDev': t_std})
+        data.append({'Model': model, 'Level': 'Subject', 'Accuracy': s_acc, 'StdDev': s_std})
+
+    df = pd.DataFrame(data)
+
+    # Function to map values to min-max interval for error bars
+    def map_to_error(series):
+        mean = series
+        return mean - 5, mean + 5
+
+    # Creating the bar chart
+    plt.figure(figsize=(12, 6))
+    sns.barplot(data=df, x='Level', y='Accuracy', hue='Model', capsize=0.1)
+    plt.title('Accuracy of Models by Classification Level')
+    plt.ylabel('Accuracy (%)')
+    plt.xlabel('Classification Level')
+
+    # Bottom error, then top
+    yerr = [df['Accuracy'] - df['StdDev'], df['Accuracy'] + df['StdDev']]
+
+    plt.errorbar(x=[0, 1, 2, 3, 4, 5, 6, 7], y=df['Accuracy'],
+                 yerr=yerr, fmt='none', c='r')
+
+    plt.show()
+
+
+def grouped_bar_chart():
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+
+    ROCKET = 'Rocket'
+    IT = 'InceptionTime'
+    DROCKET = 'Detach-Rocket'
+    Brien = 'Brien et al.'
+    TRIAL = 'Trial'
+    SUBJECT = 'Subject'
+
+    df = DataFrame(columns=['Model', 'Level', 'Accuracy'],
+                   data=[
+                       [IT, TRIAL, 51.82],
+                       [IT, TRIAL, 59.32],
+                       [IT, TRIAL, 55.00],
+                       [IT, TRIAL, 55.00],
+                       [IT, TRIAL, 57.50],
+                       [IT, SUBJECT, 68.75],
+                       [IT, SUBJECT, 81.25],
+                       [IT, SUBJECT, 81.25],
+                       [IT, SUBJECT, 75.00],
+                       [IT, SUBJECT, 81.25],
+                       [ROCKET, TRIAL, 66.14],
+                       [ROCKET, TRIAL, 65.91],
+                       [ROCKET, TRIAL, 67.95],
+                       [ROCKET, TRIAL, 68.86],
+                       [ROCKET, TRIAL, 71.36],
+                       [ROCKET, SUBJECT, 87.5],
+                       [ROCKET, SUBJECT, 87.5],
+                       [ROCKET, SUBJECT, 81.25],
+                       [ROCKET, SUBJECT, 87.5],
+                       [ROCKET, SUBJECT, 93.75],
+                       [DROCKET, TRIAL, 73.86],
+                       [DROCKET, TRIAL, 73.41],
+                       [DROCKET, TRIAL, 74.32],
+                       [DROCKET, TRIAL, 72.05],
+                       [DROCKET, TRIAL, 73.64],
+                       [DROCKET, SUBJECT, 100.00],
+                       [DROCKET, SUBJECT, 93.75],
+                       [DROCKET, SUBJECT, 93.75],
+                       [DROCKET, SUBJECT, 93.75],
+                       [DROCKET, SUBJECT, 100.00],
+                       [DROCKET, SUBJECT, 100.00],
+                       [Brien, SUBJECT, 86.8],
+                       [Brien, SUBJECT, 77.3],
+                   ])
+
+    # Data provided
+    models = ["ROCKET", "Detach-ROCKET", "InceptionTime", "Brien et al."]
+    trial_accuracies = [68.04, 73.46, 55.73, None]  # None for Brien et al.
+    trial_std_dev = [2.23, 0.85, 2.84, None]
+    subject_accuracies = [87.50, 96.25, 77.50, 82.00]
+    subject_std_dev = [4.42, 3.42, 5.59, 6.7]
+
+    # Creating a DataFrame
+    # data = []
+    # for model, t_acc, t_std, s_acc, s_std in zip(models, trial_accuracies, trial_std_dev, subject_accuracies,
+    #                                             subject_std_dev):
+    #    data.append({'Model': model, 'Level': 'Trial', 'Accuracy': t_acc, 'StdDev': t_std})
+    #    data.append({'Model': model, 'Level': 'Subject', 'Accuracy': s_acc, 'StdDev': s_std})
+    #
+    # df = pd.DataFrame(data)
+
+    # Function to map values to min-max interval for error bars
+    def map_to_error(series):
+        mean = series
+        return mean - 5, mean + 5
+
+    # Creating the bar chart
+    plt.figure(figsize=(5, 3))
+    plt.grid(axis='y')
+    sns.barplot(data=df, x='Level', y='Accuracy', hue='Model', capsize=0.05, errorbar='sd')
+    plt.title('Accuracy of Models by Classification Level')
+    plt.ylabel('Accuracy (%)')
+    plt.xlabel('Classification Level')
+    plt.legend(loc='lower center', bbox_to_anchor=(0.5, -0.5), ncol=2)
+    plt.tight_layout()
+    plt.ylim(0, 105)
+
+    # Bottom error, then top
+    # yerr = [df['Accuracy'] - df['StdDev'], df['Accuracy'] + df['StdDev']]
+    #
+    # plt.errorbar(x=[0, 1, 2, 3, 4, 5, 6, 7], y=df['Accuracy'],
+    #             yerr=yerr, fmt='none', c='r')
+
+    plt.show()
+
+
+grouped_bar_chart()
