@@ -4,8 +4,9 @@ This file contains utilities related to the feature selection and interpretabili
 
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.linear_model import (RidgeClassifierCV, RidgeClassifier)
 from scipy.signal import welch
+from sklearn.linear_model import (RidgeClassifierCV, RidgeClassifier)
+
 
 # from sktime.transformations.panel.rocket import (
 #     Rocket,
@@ -260,7 +261,7 @@ def select_optimal_model(percentage_vector,
     return max_index, max_percentage
 
 
-def retrain_optimal_model(feature_importance_matrix,
+def retrain_optimal_model(feature_selection_matrix,
                           X_train_scaled_transform,
                           X_test_scaled_transform,
                           y_train,
@@ -275,8 +276,8 @@ def retrain_optimal_model(feature_importance_matrix,
 
     Parameters
     ----------
-    feature_importance_matrix: numpy array
-        A 2d array of shape (# steps, # features) with the importance of the features at each detachment step
+    feature_selection_matrix: numpy array
+        A 2d array of shape (# steps, # features) with the selection of the features at each detachment step
     X_train_scaled_transform: numpy array
         Training features matrix, a 2d array of shape (# instances, # dimensions)
     X_test_scaled_transform: numpy array
@@ -310,7 +311,7 @@ new_alpha_classifier, new_alpha_acc_train, new_alpha_acc_test, old_alpha_classif
         Balanced accuracy on the test set with old_alpha_acc_train
     """
 
-    feature_mask = feature_importance_matrix[max_index] > 0
+    feature_mask = feature_selection_matrix[max_index]
     masked_X_train = X_train_scaled_transform[:, feature_mask]
     masked_X_test = X_test_scaled_transform[:, feature_mask]
 
@@ -367,19 +368,19 @@ new_alpha_classifier, new_alpha_acc_train, new_alpha_acc_test, old_alpha_classif
 def compute_power_frequency(vector, sampling_rate, num_bins):
     # Compute the power spectrum using Welch's method
     f, Pxx = welch(vector, fs=sampling_rate)
-    
+
     # # Calculate bin width based on the number of bins
     # bin_width = f[-1] / num_bins
-    
+
     # binned_power = np.zeros(num_bins)
     # center_frequencies = np.zeros(num_bins)
-    
+
     # for i in range(num_bins):
     #     freq_range = [i * bin_width, (i + 1) * bin_width]
     #     indices = np.where((f >= freq_range[0]) & (f < freq_range[1]))
     #     binned_power[i] = np.mean(Pxx[indices])
     #     center_frequencies[i] = np.mean(f[indices])
-    
+
     # # Normalize the binned power spectrum
     # normalized_power = binned_power / np.sum(binned_power)
     # return normalized_power, center_frequencies
@@ -388,19 +389,20 @@ def compute_power_frequency(vector, sampling_rate, num_bins):
 
     return normalized_power, f
 
-def compute_average_power_spectrum(time_series_list, sampling_rate, num_bins):
 
+def compute_average_power_spectrum(time_series_list, sampling_rate, num_bins):
     power_spectrum, center_frequencies = compute_power_frequency(time_series_list[0], sampling_rate, num_bins)
     total_power_spectrum = np.zeros(len(center_frequencies))
-    
+
     for time_series in time_series_list:
         power_spectrum, center_frequencies = compute_power_frequency(time_series, sampling_rate, num_bins)
         total_power_spectrum += power_spectrum
-    
+
     average_power_spectrum = total_power_spectrum / len(time_series_list)
     # print('here')
 
     return average_power_spectrum, center_frequencies
+
 
 def plot_power_spectrum(center_frequencies, power_spectrum):
     plt.figure(figsize=(10, 6))
