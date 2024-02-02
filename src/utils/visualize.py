@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import torch
 from matplotlib import colors as m_colors
 from matplotlib import pyplot as plt
@@ -10,7 +11,7 @@ from sklearn.metrics import ConfusionMatrixDisplay
 from torch import Tensor, logical_and
 
 from utils.data import normalize
-from utils.ki import SACCADE
+from utils.ki import SACCADE, LABELS
 from utils.path import figure_path
 
 
@@ -97,6 +98,45 @@ def separate_latent_space_by_attr(manifold, labels, attribute, class_names, attr
     # Save figure as svg
     fig.savefig('latent_representation_saccade.svg', format='svg', dpi=1200)
 
+    if show:
+        plt.show()
+    return fig, ax
+
+
+# Uses a metadata dataframe to set the opacity based on a series (key)
+def t_sne_subject_metadata(manifold, labels, subject_ids, class_names, metadata, show=True, title='Latent Neighborhood',
+                           key='age'):
+    colors = ['blue', 'darkorange']
+    cmap = m_colors.ListedColormap(colors)
+
+    # Create mask for all subjects in the data that has metadata.
+    has_metadata = np.isin(subject_ids, metadata['ID'])
+    # Mask the rows
+    manifold = manifold[has_metadata]
+    labels = labels[has_metadata]
+    subject_ids = subject_ids[has_metadata]
+
+    # Reorder and replicate rows in df based on subject IDs for the datapoints above
+    reordered_df = pd.concat([metadata[metadata.ID == s_id] for s_id in subject_ids.tolist()])
+
+    # Create array to set alpha for every trial based on the age series in metadata for the corresponding ID.
+    # Should create values in range [0.5 - 1]
+    min_subtracted_values = reordered_df[key] - reordered_df[key].min()
+    normalized_values = 0.5 + (min_subtracted_values / min_subtracted_values.max()) / 2
+
+    fig, ax = plt.subplots(figsize=(3.8, 3))
+    scatter = ax.scatter(manifold[:, 0][labels == LABELS['HC']], manifold[:, 1][labels == LABELS['HC']],
+                         c=normalized_values.values[labels == LABELS['HC']], s=20, marker='x')  # ,
+    scatter = ax.scatter(manifold[:, 0][labels == LABELS['PDOFF']], manifold[:, 1][labels == LABELS['PDOFF']],
+                         c=normalized_values.values[labels == LABELS['PDOFF']], s=20, marker='o')  # ,
+    # cmap=cmap)
+    # ax.legend(handles=scatter.legend_elements()[0], labels=class_names, loc='upper left')
+    # Remove the ticks from
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_title(title)
+    ax.set_xlabel('Dimension 1')
+    ax.set_ylabel('Dimension 2')
     if show:
         plt.show()
     return fig, ax
@@ -206,7 +246,7 @@ def plot_confusion_matrix(labels, predictions, class_names, title='Confusion Mat
     return figure
 
 
-def plot_latent_neighborhood(features, batch, class_names, filename='', show=False):
+def plot_latent_neighborhood(features, batch, class_names, filename='', show=False, metadata=None, key='age'):
     """
     Plot a 2d TSNE embedding of the features computed from the batch
     :param features: The high dimensional features from the model
@@ -214,6 +254,8 @@ def plot_latent_neighborhood(features, batch, class_names, filename='', show=Fal
     :param class_names: The names of the classes in the dataset
     :param filename: The filename to save the plot to. If a filename is provided, the plot will be saved as an svg.
     :param show: Whether to show the plot.
+    :param metadata: Subject metadata as an optional dataframe. If passed, will visualize based on key
+    :param key: The metadata key to visualize with the t-sne plot
     """
     tsne = TSNE(n_components=2, perplexity=30)
     manifold = tsne.fit_transform(features.detach())
@@ -222,6 +264,11 @@ def plot_latent_neighborhood(features, batch, class_names, filename='', show=Fal
 
     fig, ax = visualize_latent_space(manifold, batch.y, class_names, show=False,
                                      title='Latent Representation of Test Set')
+
+    if metadata is not None:
+        fig, ax = t_sne_subject_metadata(manifold, batch.y, batch.z, class_names, metadata, show=True,
+                                         title='Latent Representation of Test Set', key=key)
+
     plt.tight_layout()
     if len(filename):
         fig.savefig(f'{figure_path.joinpath(filename)}.svg', format='svg', dpi=1200)
