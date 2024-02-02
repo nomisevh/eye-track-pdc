@@ -518,6 +518,3 @@ def grouped_bar_chart():
     #             yerr=yerr, fmt='none', c='r')
 
     plt.show()
-
-
-grouped_bar_chart()
