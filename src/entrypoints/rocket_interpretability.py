@@ -129,7 +129,7 @@ def main(seed, correct_way=True, use_cached_features=True):
     # call retrain optimal model
     retrained_clf = retrain_optimal_model(feature_selection_matrix, train_val_features, test_features,
                                           train_val_labels, test_labels, train_score, test_score, ridge_clf.alpha,
-                                          optimal_index)
+                                          optimal_index, test_batch)
 
     # Print the optimal percentage of features in percentage style with 2 decimal places
     print(' ')
@@ -264,4 +264,4 @@ def visualize_convolution(x, output_signal, ax, padding):
 
 
 if __name__ == '__main__':
-    main(2, use_cached_features=False)
+    main(42, use_cached_features=False) #9000 #2

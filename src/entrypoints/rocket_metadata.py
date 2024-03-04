@@ -9,10 +9,12 @@ from yaml import load as load_yaml, FullLoader
 
 from datamodule import KIDataModule
 from utils.misc import set_random_state
-from utils.path import ki_data_path, rocket_instances_path, config_path
+from utils.path import ki_data_path, rocket_instances_path, config_path, figure_path
 from utils.visualize import plot_latent_neighborhood
 
-SEED = 2
+from scipy import stats
+
+SEED = 42 # 2 # 9000 # 42
 
 
 def main():
@@ -25,11 +27,29 @@ def main():
                       bundle_as_experiments=False,
                       exclude=['vert'],
                       binary_classification=True,
+                      val_size=0.2, # Change to zero for having all the training data in the plot (0.2 default)
                       batch_size=-1)
-    dm.setup('test')
+    
+    # Select the set to visualize 
+    selected_set = 'train' # 'test' 'train' 'all' 
 
-    # Batch is entire dataset
-    test_batch = next(iter(dm.test_dataloader()))
+    # Select the feature to visualize
+    selected_feature = ['Age'] #['Age'] ['UPDRS_ON'] ['UPDRS_OFF'] ['MoCA'] ['FAB'] ['Duration'] ['Subtype']
+
+    if selected_set == 'train':
+        dm.setup('fit')
+        # Batch is entire dataset
+        selected_batch = next(iter(dm.train_dataloader()))
+    elif selected_set == 'test':
+        dm.setup('test')
+        # Batch is entire dataset
+        selected_batch = next(iter(dm.test_dataloader()))
+    elif selected_set == 'all':
+        dm.setup('fit')
+        selected_batch = next(iter(dm.train_dataloader()))
+        dm.setup('test')
+        # Batch is entire dataset
+        selected_batch = selected_batch + next(iter(dm.test_dataloader()))
 
     # Initialize rocket with saved weights
     rocket = torch.load(rocket_instances_path.joinpath(f'pruned_rocket_{SEED}.ckpt'))
@@ -38,31 +58,70 @@ def main():
     with open(rocket_instances_path.joinpath(f'pruned_rocket_clf_{SEED}.pkl'), 'rb') as reader:
         ridge_clf = pickle.load(reader)
 
-    test_features = rocket(test_batch.x)
-    scores = ridge_clf.decision_function(test_features)
-    preds = ridge_clf.predict(test_features)
+    selected_features = rocket(selected_batch.x)
+    scores = ridge_clf.decision_function(selected_features)
+    preds = ridge_clf.predict(selected_features)
     # probs = np.exp(scores) / np.sum(np.exp(scores))
     scores_normalized = scores - scores.mean() / scores.std()
 
-    df = pd.read_excel(ki_data_path.joinpath('age_ID_table.xlsx'))
+    #df = pd.read_excel(ki_data_path.joinpath('age_ID_table.xlsx'))
+    df = pd.read_excel(ki_data_path.joinpath('metadata_ID_table.xlsx'))
+
+
+    # Convert column ['Subtype'] to a categorical variable with values 0 when 'rigidity', 1 when 'mixed' and 2 when 'tremor'
+
+    # Create a dictionary to map the values to integers
+    mapping = {'rigid': 1, 'mixed': 2, 'tremor': 3}
+
+    # Apply the mapping to the column ['Subtype']
+    df['Subtype'] = df['Subtype'].map(mapping)
 
     # Remove one datapoint that is known to be inaccurate (124 y/o)
     df.drop(df[df.ID == 43].index, inplace=True)
 
-    plot_latent_neighborhood(test_features, test_batch, dm.class_names(), show=True, metadata=df, key='Age')
+    # remove rows with missing values in selected_feature
+    df = df.dropna(subset=selected_feature)
 
-    compute_metadata_correlation(preds, scores_normalized, test_batch.z, metadata=df, labels=test_batch.y)
+    plot_latent_neighborhood(selected_features, selected_batch, dm.class_names(), filename='age_matched' + selected_set+'_plot_latent_space_'+selected_feature[0], show=True, metadata=df, key=selected_feature[0])
+
+    correlations = compute_metadata_correlation(preds, scores_normalized, selected_batch.z, metadata=df, labels=selected_batch.y, selected_feature=selected_feature[0])
+
+    # Print correlation coefficients of all keys in correlations
+    for key in correlations:
+        try:
+            print(f'Correlation between {selected_feature[0]} and {key}: {correlations[key][0, 1]}')
+        except:
+            print(f'Correlation between {selected_feature[0]} and {key}: {correlations[key].correlation}') 
+            print(f'p-value: {correlations[key].pvalue}')
+            print(' ')
+
+    if selected_feature[0] == 'Age':        
+        # Compute KS test for the age feature
+        ks_test = compute_ks_test_age(selected_batch.z, df, 'age_matched' + selected_set+'_age_distribution')
+
+        # Print KS test results (both the statistic and the p-value)
+        print('Age distribution in HC and PD groups:')
+        print(f'KS test statistic: {ks_test.statistic}')
+        print(f'KS test p-value: {ks_test.pvalue}')
+
+        # Determine if we can reject the null hypothesis
+        if ks_test.pvalue < 0.05:
+            print('The null hypothesis can be rejected. The two distributions are different.')
+        else:
+            print('The null hypothesis cannot be rejected. The two distributions may be the same.')
 
     # The RidgeClassifier maps the targets to {-1, 1}, but our labels are {0, 1}
-    preds[preds < 0] = 0
+    #preds[preds < 0] = 0
 
-    trial_probs = tensor(preds)
+    #trial_probs = tensor(preds)
 
-    # evaluate(test_batch, trial_probs, test_features, dm.class_names(), model_name='ROCKET')
+    # evaluate(selected_batch, trial_probs, selected_features, dm.class_names(), model_name='ROCKET')
+
+    return selected_batch
 
 
 # Computes the correlation between the prediction scores and the various series in the metadata dataframe.
-def compute_metadata_correlation(predictions, scores, subject_ids, metadata, labels):
+def compute_metadata_correlation(predictions, scores, subject_ids, metadata, labels, selected_feature):
     # Create mask for all subjects in the data that has metadata.
     has_metadata = np.isin(subject_ids, metadata['ID'])
     # Ignore datapoints for which we don't have metadata
@@ -74,19 +133,79 @@ def compute_metadata_correlation(predictions, scores, subject_ids, metadata, lab
     # Reorder and repeat rows in df based on subject IDs for the datapoints above
     reordered_df = pd.concat([metadata[metadata.ID == s_id] for s_id in subject_ids.tolist()])
 
-    # Compute correlation for each series in metadata
-    correlations = {
-        'Age': np.corrcoef(scores, reordered_df['Age']),
-        'Labels': np.corrcoef(labels, reordered_df['Age']),
-        'Predictions': np.corrcoef(predictions, reordered_df['Age']),
-    }
+    # Correlation with labels is only relevant when selected_feature is 'Age' (there are two classes)
+    if selected_feature == 'Age':
+        # Compute correlation for each series in metadata
+        res = stats.spearmanr(scores, reordered_df[selected_feature], alternative='two-sided')
+        correlations = {
+            #'Scores': np.corrcoef(scores, reordered_df[selected_feature]),
+            'Scores': res,
+            'Labels': stats.spearmanr(labels, reordered_df[selected_feature]),
+            'Predictions': stats.spearmanr(predictions, reordered_df[selected_feature]),
+        }
 
-    fig, ax = plt.subplots()
+        fig, ax = plt.subplots()
+        ax.scatter(labels, reordered_df[selected_feature], c=predictions == labels.numpy)
 
-    ax.scatter(labels, reordered_df['Age'], c=predictions == labels.numpy)
+    else:
+        # Compute correlation for each series in metadata
+        res = stats.spearmanr(scores, reordered_df[selected_feature], alternative='two-sided')
+        correlations = {
+            #'Scores': np.corrcoef(scores, reordered_df[selected_feature]),
+            'Scores': res,
+            'Predictions': stats.spearmanr(predictions, reordered_df[selected_feature])
+        }
+        
 
     return correlations
 
+def compute_ks_test_age(subject_ids, metadata, figure_filename):
+
+
+    # Create mask for all subjects in the data that has metadata.
+    has_metadata = np.isin(subject_ids, metadata['ID'])
+    # Ignore datapoints for which we don't have metadata
+    subject_ids = subject_ids[has_metadata]
+
+    # Reorder and repeat rows in df based on subject IDs for the datapoints above
+    reordered_df = pd.concat([metadata[metadata.ID == s_id] for s_id in subject_ids.tolist()])
+
+    # Create a new dataset with only the HC group
+    df_HC = reordered_df[reordered_df['grupp']=='HC']
+    # Now select only the first entrance belonging to each subject
+    df_HC = df_HC.drop_duplicates(subset='ID', keep='first')
+
+    # Print number of subjects in HC group
+    print(f'Number of subjects in HC group: {len(df_HC)}')
+
+    # Create a new dataset with only the PD group
+    df_PD = reordered_df[reordered_df['grupp']=='PD']
+    # Now select only the first entrance belonging to each subject
+    df_PD = df_PD.drop_duplicates(subset='ID', keep='first')
+
+    # Print number of subjects in PD group
+    print(f'Number of subjects in PD group: {len(df_PD)}')
+
+
+    # Compute a KS test to compare the distribution of ages feature in the HC and PD groups
+    ks_test = stats.ks_2samp(df_HC['Age'], df_PD['Age'])
+
+    # Plot histograms of the age feature for the HC and PD groups
+    fig, ax = plt.subplots()
+
+    # Plot both histograms with the same bins
+    bins = np.linspace(30, 90, 20)
+    ax.hist(df_HC['Age'], bins, alpha=0.4, label='HC')
+    ax.hist(df_PD['Age'], bins, alpha=0.4, label='PD')
+
+    ax.legend(loc='upper right')
+    ax.set_title('Age distribution in HC and PD groups')
+    ax.set_xlabel('Age')
+    ax.set_ylabel('Count')
+    plt.savefig(f'{figure_path.joinpath(figure_filename)}.svg', format='svg', dpi=1200)
+    plt.show()
+
+    return ks_test
 
 if __name__ == '__main__':
     main()
