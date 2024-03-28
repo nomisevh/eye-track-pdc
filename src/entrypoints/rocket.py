@@ -1,5 +1,6 @@
 import pickle
 
+import numpy as np
 import torch
 from sklearn.linear_model import RidgeClassifier
 from torch import tensor
@@ -65,7 +66,19 @@ def main(seed, use_pruned_model=False):
 
     test_trial_probs = tensor(test_pred)
 
-    evaluate(test_batch, test_trial_probs, test_features, dm.class_names(), model_name='ROCKET')
+    scores = ridge_clf.decision_function(test_features)
+    sorted_indices = scores.argsort()
+
+    # Initialize an array of the same shape as arr to hold the ranks
+    ranks = np.empty_like(sorted_indices, dtype=float)
+
+    # Assign ranks to the sorted elements (starting from 1)
+    ranks[sorted_indices] = np.arange(1, len(sorted_indices) + 1)
+
+    sorted_scores = ranks / ranks.max()
+
+    evaluate(test_batch, test_trial_probs, test_features, dm.class_names(), model_name='ROCKET',
+             test_trial_scores=sorted_scores)
 
 
 if __name__ == '__main__':

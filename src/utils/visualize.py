@@ -46,9 +46,10 @@ def plot_series_samples(data: Tensor, n: int, labels: Tensor, seed: int = 42):
     # fig.savefig('samples.png')
 
 
-def visualize_latent_space(manifold, labels, class_names, show=True, title='Latent Neighborhood'):
+def visualize_latent_space(manifold, labels, class_names, show=True, title='Latent Neighborhood', cmap=None):
     colors = ['blue', 'darkorange']
-    cmap = m_colors.ListedColormap(colors)
+    if cmap is None:
+        cmap = m_colors.ListedColormap(colors)
 
     fig, ax = plt.subplots(figsize=(3.8, 3))
     scatter = ax.scatter(manifold[:, 0], manifold[:, 1], c=labels, s=20, alpha=0.8, cmap=cmap)
@@ -246,7 +247,8 @@ def plot_confusion_matrix(labels, predictions, class_names, title='Confusion Mat
     return figure
 
 
-def plot_latent_neighborhood(features, batch, class_names, filename='', show=False, metadata=None, key='age'):
+def plot_latent_neighborhood(features, batch, class_names, filename='', show=False, metadata=None,
+                             key='age', scores=None):
     """
     Plot a 2d TSNE embedding of the features computed from the batch
     :param features: The high dimensional features from the model
@@ -256,6 +258,7 @@ def plot_latent_neighborhood(features, batch, class_names, filename='', show=Fal
     :param show: Whether to show the plot.
     :param metadata: Subject metadata as an optional dataframe. If passed, will visualize based on key
     :param key: The metadata key to visualize with the t-sne plot
+    :param scores: The scores in range [0,1] for each datapoint.
     """
     tsne = TSNE(n_components=2, perplexity=30)
     manifold = tsne.fit_transform(features.detach())
@@ -264,6 +267,10 @@ def plot_latent_neighborhood(features, batch, class_names, filename='', show=Fal
 
     fig, ax = visualize_latent_space(manifold, batch.y, class_names, show=False,
                                      title='Latent Representation of Test Set')
+
+    if scores is not None:
+        fig, ax = visualize_latent_space(manifold, scores, class_names, show=False,
+                                         title='Latent Representation of Test Set', cmap='viridis')
 
     if metadata is not None:
         fig, ax = t_sne_subject_metadata(manifold, batch.y, batch.z, class_names, metadata, show=True,

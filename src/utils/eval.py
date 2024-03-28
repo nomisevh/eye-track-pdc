@@ -5,7 +5,7 @@ from utils.metric import vote_aggregation, max_f1_score
 from utils.visualize import plot_confusion_matrix, plot_latent_neighborhood
 
 
-def evaluate(batch, trial_probs, features, class_names, model_name):
+def evaluate(batch, trial_probs, features, class_names, model_name, test_trial_scores=None):
     # Aggregate predictions to the subject level
     _, test_subject_labels, test_subject_probs = vote_aggregation(segment_scores=trial_probs, labels=batch.y,
                                                                   aggregate_by=batch.z)
@@ -47,4 +47,5 @@ def evaluate(batch, trial_probs, features, class_names, model_name):
                           show=True)
 
     # Visualize the latent neighborhoods with TSNE
-    plot_latent_neighborhood(features, batch, class_names, show=True)
+    plot_latent_neighborhood(features, batch, class_names, show=True,
+                             scores=test_trial_scores if test_trial_scores is not None else None)
