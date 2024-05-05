@@ -10,6 +10,9 @@ import types
 import matplotlib.colors as m_colors
 import numpy as np
 import torch
+import os
+
+from joblib import load
 from matplotlib import pyplot as plt
 from sklearn.linear_model import RidgeClassifier
 from sklearn.metrics import balanced_accuracy_score
@@ -20,7 +23,7 @@ from datamodule import KIDataModule
 from models.rocket import dissected_forward, ROCKET
 from utils.interpretability import feature_detachment, select_optimal_model, retrain_optimal_model
 from utils.misc import set_random_state
-from utils.path import config_path, rocket_instances_path, figure_path
+from utils.path import config_path, rocket_instances_path, figure_path, ki_data_tmp_path
 
 
 def main(seed, correct_way=True, use_cached_features=True):
@@ -127,7 +130,7 @@ def main(seed, correct_way=True, use_cached_features=True):
         optimal_index, optimal_percentage = select_optimal_model(percentage_vector, score_list_test, score_list_test[0])
 
     # call retrain optimal model
-    retrained_clf = retrain_optimal_model(feature_selection_matrix, train_val_features, test_features,
+    retrained_clf = retrain_optimal_model(feature_importance_matrix, train_val_features, test_features,
                                           train_val_labels, test_labels, train_score, test_score, ridge_clf.alpha,
                                           optimal_index, test_batch)
 
