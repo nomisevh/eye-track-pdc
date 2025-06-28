@@ -14,7 +14,7 @@ from utils.visualize import plot_latent_neighborhood
 
 from scipy import stats
 
-SEED = 42 # 2 # 9000 # 42
+SEED = 9000 # 2 # 9000 # 42
 
 
 def main():
@@ -31,10 +31,10 @@ def main():
                       batch_size=-1)
     
     # Select the set to visualize 
-    selected_set = 'train' # 'test' 'train' 'all' 
+    selected_set = 'test' # 'test' 'train' 'all'
 
     # Select the feature to visualize
-    selected_feature = ['Age'] #['Age'] ['UPDRS_ON'] ['UPDRS_OFF'] ['MoCA'] ['FAB'] ['Duration'] ['Subtype']
+    selected_feature = ['Duration'] #['Age'] ['UPDRS_ON'] ['UPDRS_OFF'] ['MoCA'] ['FAB'] ['Duration'] ['Subtype']
 
     if selected_set == 'train':
         dm.setup('fit')
@@ -50,9 +50,17 @@ def main():
         dm.setup('test')
         # Batch is entire dataset
         selected_batch = selected_batch + next(iter(dm.test_dataloader()))
+    #print(type(selected_batch))
 
     # Initialize rocket with saved weights
     rocket = torch.load(rocket_instances_path.joinpath(f'pruned_rocket_{SEED}.ckpt'))
+
+    # Load the normalization parameters
+    with open(rocket_instances_path.joinpath(f'pruned_rocket_normalization_{SEED}.pkl'), 'rb') as reader:
+        rocket_params = pickle.load(reader)
+        rocket.mean = rocket_params['mean']
+        rocket.std = rocket_params['std']
+    rocket.train = False
 
     # Initialize the classifier with saved weights
     with open(rocket_instances_path.joinpath(f'pruned_rocket_clf_{SEED}.pkl'), 'rb') as reader:
@@ -62,7 +70,7 @@ def main():
     scores = ridge_clf.decision_function(selected_features)
     preds = ridge_clf.predict(selected_features)
     # probs = np.exp(scores) / np.sum(np.exp(scores))
-    scores_normalized = scores - scores.mean() / scores.std()
+    scores_normalized = (scores - scores.mean()) / scores.std()
 
     #df = pd.read_excel(ki_data_path.joinpath('age_ID_table.xlsx'))
     df = pd.read_excel(ki_data_path.joinpath('metadata_ID_table.xlsx'))
@@ -82,7 +90,14 @@ def main():
     # remove rows with missing values in selected_feature
     df = df.dropna(subset=selected_feature)
 
-    plot_latent_neighborhood(selected_features, selected_batch, dm.class_names(), filename='age_matched' + selected_set+'_plot_latent_space_'+selected_feature[0], show=True, metadata=df, key=selected_feature[0])
+    plot_latent_neighborhood(selected_features, selected_batch, dm.class_names(), filename='age_matched' + selected_set+'_plot_latent_space_'+selected_feature[0], show=True, metadata=df, key=selected_feature[0],scores=list(scores_normalized))
+
+    plt.scatter(selected_batch.y, scores_normalized, c=preds == selected_batch.y.numpy())
+    plt.show()
+
+    #print(scores_normalized.mean())
+    #print(type(list(scores_normalized)))
+    #print(type(scores_normalized[0]))
 
     correlations = compute_metadata_correlation(preds, scores_normalized, selected_batch.z, metadata=df, labels=selected_batch.y, selected_feature=selected_feature[0])
 
@@ -110,12 +125,27 @@ def main():
         else:
             print('The null hypothesis cannot be rejected. The two distributions may be the same.')
 
+    correlations_medication = compute_correlation_medication(selected_batch.g, scores_normalized, selected_batch.z, metadata=df, labels=selected_batch.y)
+
+    # Print the correlation coefficients of the medication status
+    print(f'Patient Correlation between score and medication status: {correlations_medication["Scores"].correlation}')
+    print(f'p-value: {correlations_medication["Scores"].pvalue}')
+    print(' ')
+
     # The RidgeClassifier maps the targets to {-1, 1}, but our labels are {0, 1}
     #preds[preds < 0] = 0
-
-    #trial_probs = tensor(preds)
-
+    # trial_probs = tensor(preds)
     # evaluate(selected_batch, trial_probs, selected_features, dm.class_names(), model_name='ROCKET')
+
+    correlations = compute_metadata_correlation_patient(preds, scores_normalized, selected_batch.z, metadata=df, labels=selected_batch.y, selected_feature=selected_feature[0])
+    # Print correlation coefficients of all keys in correlations
+    for key in correlations:
+        try:
+            print(f'Patient Correlation between {selected_feature[0]} and {key}: {correlations[key][0, 1]}')
+        except:
+            print(f'Patient Correlation between {selected_feature[0]} and {key}: {correlations[key].correlation}') 
+            print(f'p-value: {correlations[key].pvalue}')
+            print(' ')
 
     return selected_batch
 
@@ -129,6 +159,9 @@ def compute_metadata_correlation(predictions, scores, subject_ids, metadata, lab
     subject_ids = subject_ids[has_metadata]
     scores = scores[has_metadata]
     predictions = predictions[has_metadata]
+
+    # Print number of trials
+    print(f'Number of trials: {len(scores)}')
 
     # Reorder and repeat rows in df based on subject IDs for the datapoints above
     reordered_df = pd.concat([metadata[metadata.ID == s_id] for s_id in subject_ids.tolist()])
@@ -159,8 +192,29 @@ def compute_metadata_correlation(predictions, scores, subject_ids, metadata, lab
 
     return correlations
 
-def compute_ks_test_age(subject_ids, metadata, figure_filename):
+# Compute the correlation (only in the patient group) between the prediction scores and the medication status PDON or PDOFF (medication status come like {'HC': 0, 'PDOFF': 1, 'PDON': 2})
+def compute_correlation_medication(medication_status, scores, subject_ids, metadata, labels):
 
+    # Selec only PD subjects
+    is_PD = medication_status != 0
+    subject_ids = subject_ids[is_PD]
+    scores = scores[is_PD]
+    medication_status = medication_status[is_PD]
+    labels = labels[is_PD]
+
+    # Map, if PDOFF -> 1, PDON -> 0
+    medication_status = np.where(medication_status == 1, 0, 1)
+
+    # Compute correlation for each series in metadata
+    res = stats.spearmanr(scores, medication_status, alternative='two-sided')
+    correlations = {
+        'Scores': res
+    }
+
+    return correlations
+
+
+def compute_ks_test_age(subject_ids, metadata, figure_filename):
 
     # Create mask for all subjects in the data that has metadata.
     has_metadata = np.isin(subject_ids, metadata['ID'])
@@ -206,6 +260,49 @@ def compute_ks_test_age(subject_ids, metadata, figure_filename):
     plt.show()
 
     return ks_test
+
+# Computes the correlation between the prediction scores and the various series in the metadata dataframe, but it aggregates the data for each subject.
+def compute_metadata_correlation_patient(predictions, scores, subject_ids, metadata, labels, selected_feature):
+    # Create mask for all subjects in the data that has metadata.
+    has_metadata = np.isin(subject_ids, metadata['ID'])
+    # Ignore datapoints for which we don't have metadata
+    labels = labels[has_metadata]
+    subject_ids = subject_ids[has_metadata]
+    scores = scores[has_metadata]
+    predictions = predictions[has_metadata]
+
+    # Reorder and repeat rows in df based on subject IDs for the datapoints above
+    reordered_df = pd.concat([metadata[metadata.ID == s_id] for s_id in subject_ids.tolist()])
+
+    # Aggregate scores for each subject
+    scores_agg = []
+    ids_list = []
+    for s_id in subject_ids.unique():
+        scores_agg.append(scores[subject_ids == s_id].mean())
+        ids_list.append(int(s_id.numpy()))
+
+    # Print number of Subjects
+    print(f'Number of Subjects: {len(scores_agg)}')
+
+    # Get the selected feature for each subject
+    selected_feature_agg = []
+    for s_id in ids_list:
+        selected_feature_agg.append(reordered_df[reordered_df.ID == s_id][selected_feature].iloc[0])
+
+    #print(scores_agg)
+    #print(selected_feature_agg)
+    #plt.scatter(scores_agg, selected_feature_agg)
+    #plt.show()
+
+    res = stats.spearmanr(scores_agg, selected_feature_agg, alternative='two-sided')
+    correlations = {
+        'Scores': res,
+    }
+
+    return correlations
+
+
+
 
 if __name__ == '__main__':
     main()

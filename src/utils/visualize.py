@@ -3,6 +3,7 @@ import pandas as pd
 import torch
 from matplotlib import colors as m_colors
 from matplotlib import pyplot as plt
+from matplotlib import colormaps as m_colormaps
 from numpy import median
 from pandas import DataFrame
 from scipy.stats import median_absolute_deviation
@@ -14,6 +15,7 @@ from utils.data import normalize
 from utils.ki import SACCADE, LABELS
 from utils.path import figure_path
 
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 def plot_series_samples(data: Tensor, n: int, labels: Tensor, seed: int = 42):
     """
@@ -51,19 +53,79 @@ def visualize_latent_space(manifold, labels, class_names, show=True, title='Late
     if cmap is None:
         cmap = m_colors.ListedColormap(colors)
 
-    fig, ax = plt.subplots(figsize=(3.8, 3))
-    scatter = ax.scatter(manifold[:, 0], manifold[:, 1], c=labels, s=20, alpha=0.8, cmap=cmap)
-    ax.legend(handles=scatter.legend_elements()[0], labels=class_names, loc='upper left')
+        fig, ax = plt.subplots(figsize=(3.8, 3))
+        scatter = ax.scatter(manifold[:, 0], manifold[:, 1], c=labels, s=20, alpha=0.8, cmap=cmap)
+    
+        ax.legend(handles=scatter.legend_elements()[0], labels=class_names, loc='upper right')
+    else:
+        fig, ax = plt.subplots(figsize=(3.8, 3))
+        scatter = ax.scatter(manifold[:, 0], manifold[:, 1], c=labels, s=20, alpha=0.8, cmap=cmap, vmin=-1.5, vmax=1.5) 
+        cbaxes = inset_axes(ax, width="30%", height="5%", loc=1)
+        fig.colorbar(scatter, cax=cbaxes, ticks=[-1,1], orientation='horizontal', label='Model Score')
+
     # Remove the ticks from
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_title(title)
     ax.set_xlabel('Dimension 1')
     ax.set_ylabel('Dimension 2')
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
     if show:
         plt.show()
-    return fig, ax
+    return fig, ax, xlim, ylim
 
+def visualize_latent_space_medication(manifold, labels, attribute, class_names, show=True, title='Latent Neighborhood', cmap=None):
+
+    hc = logical_and(labels == 0, attribute == LABELS['HC'])
+    pd_off = logical_and(labels == 1, attribute == LABELS['PDOFF'])
+    pd_on = logical_and(labels == 1, attribute == LABELS['PDON'])
+
+    if cmap is not None:
+
+        # Get colors from cmap
+        color_map = m_colormaps[cmap]
+        colors = [color_map(0.0), color_map(0.5), color_map(1.0)]
+
+        # Fixed colors (change darkorange for other two colors)
+        #colors = ['blue', 'limegreen', 'indianred']
+
+        fig, ax = plt.subplots(figsize=(3.8, 3))
+        scatter_hc = ax.scatter(manifold[hc, 0], manifold[hc, 1], s=20, cmap=cmap, alpha=0.8, color=colors[0], marker='o')
+
+        # Plot with full circles for PD Off
+        scatter_pd_off = ax.scatter(manifold[pd_on, 0], manifold[pd_on, 1], s=20, alpha=0.8, color=colors[1], marker='o')
+
+        # Plot with empty circles for PD On
+        scatter_pd_on = ax.scatter(manifold[pd_off, 0], manifold[pd_off, 1], s=20, alpha=0.8, color=colors[2], marker='o')
+
+    else:
+        colors = ['blue', 'darkorange']
+        cmap = m_colors.ListedColormap(colors)
+
+        fig, ax = plt.subplots(figsize=(3.8, 3))
+
+        scatter_hc = ax.scatter(manifold[hc, 0], manifold[hc, 1], s=20, cmap=cmap, alpha=0.8,color='blue', marker='o')
+
+        # Plot with full circles for PD Off
+        scatter_pd_off = ax.scatter(manifold[pd_off, 0], manifold[pd_off, 1], s=20, alpha=0.8,color='darkorange', marker='o')
+
+        # Plot with empty circles for PD On 
+        scatter_pd_on = ax.scatter(manifold[pd_on, 0], manifold[pd_on, 1], s=20, alpha=0.8,cmap=cmap, facecolors='none', edgecolors='darkorange')
+
+    ax.legend((scatter_hc, scatter_pd_on, scatter_pd_off), ('HC', 'PD On', 'PD Off'), loc='upper right')
+
+    # Remove the ticks from
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_title(title)
+    ax.set_xlabel('Dimension 1')
+    ax.set_ylabel('Dimension 2')
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    if show:
+        plt.show()
+    return fig, ax, xlim, ylim
 
 def separate_latent_space_by_attr(manifold, labels, attribute, class_names, attribute_names, show=True, title=''):
     colors = ['blue', 'darkorange']
@@ -77,14 +139,14 @@ def separate_latent_space_by_attr(manifold, labels, attribute, class_names, attr
     pd_anti = logical_and(labels == 1, attribute == SACCADE['anti'])
 
     # Plot the latent space with the labels as colors and the attribute as the marker
-    scatter_hc_pro = ax.scatter(manifold[hc_pro, 0], manifold[hc_pro, 1], s=20, cmap=cmap, alpha=0.8,
-                                color='blue', marker='^')
-    scatter_hc_anti = ax.scatter(manifold[hc_anti, 0], manifold[hc_anti, 1], s=20, alpha=0.8,
-                                 cmap=cmap, marker='x', color='blue')
+    scatter_hc_pro = ax.scatter(manifold[hc_pro, 0], manifold[hc_pro, 1], s=20, cmap=cmap, alpha=0.8,color='blue', marker='^')
+
+    scatter_hc_anti = ax.scatter(manifold[hc_anti, 0], manifold[hc_anti, 1], s=20,      alpha=0.8,cmap=cmap, marker='x', color='blue')
+
     scatter_pd_pro = ax.scatter(manifold[pd_pro, 0], manifold[pd_pro, 1], s=20, alpha=0.8,
-                                color='darkorange', marker='^')
-    scatter_pd_anti = ax.scatter(manifold[pd_anti, 0], manifold[pd_anti, 1], c='darkorange', s=20, alpha=0.8,
-                                 cmap=cmap, marker='x')
+    color='darkorange', marker='^')
+    
+    scatter_pd_anti = ax.scatter(manifold[pd_anti, 0], manifold[pd_anti, 1], c='darkorange', s=20, alpha=0.8,cmap=cmap, marker='x')
 
     ax.legend((scatter_hc_pro, scatter_hc_anti, scatter_pd_pro, scatter_pd_anti),
               ('HC Pro', 'HC Anti', 'PD Pro', 'PD Anti'), loc='upper left', ncol=2)
@@ -95,7 +157,7 @@ def separate_latent_space_by_attr(manifold, labels, attribute, class_names, attr
     ax.set_yticks([])
     ax.set_xlabel('Dimension 1')
     ax.set_ylabel('Dimension 2')
-    plt.tight_layout()
+
     # Save figure as svg
     fig.savefig('latent_representation_saccade.svg', format='svg', dpi=1200)
 
@@ -105,8 +167,9 @@ def separate_latent_space_by_attr(manifold, labels, attribute, class_names, attr
 
 
 # Uses a metadata dataframe to set the opacity based on a series (key)
-def t_sne_subject_metadata(manifold, labels, subject_ids, class_names, metadata, show=True, title='Latent Neighborhood',
-                           key='age'):
+def t_sne_subject_metadata(manifold, labels, subject_ids, class_names, metadata,
+                           show=True, title='Latent Neighborhood',
+                           key='age',xlim=None, ylim=None):
     colors = ['blue', 'darkorange']
     cmap = m_colors.ListedColormap(colors)
 
@@ -122,22 +185,41 @@ def t_sne_subject_metadata(manifold, labels, subject_ids, class_names, metadata,
 
     # Create array to set alpha for every trial based on the age series in metadata for the corresponding ID.
     # Should create values in range [0.5 - 1]
-    min_subtracted_values = reordered_df[key] - reordered_df[key].min()
-    normalized_values = 0.5 + (min_subtracted_values / min_subtracted_values.max()) / 2
+    #min_subtracted_values = reordered_df[key] - reordered_df[key].min()
+    #normalized_values = 0.5 + (min_subtracted_values / min_subtracted_values.max()) / 2
+    normalized_values = reordered_df[key]
 
     fig, ax = plt.subplots(figsize=(3.8, 3))
-    scatter = ax.scatter(manifold[:, 0][labels == LABELS['HC']], manifold[:, 1][labels == LABELS['HC']],
-                         c=normalized_values.values[labels == LABELS['HC']], s=20, marker='x')  # ,
+    #scatter = ax.scatter(manifold[:, 0][labels == LABELS['HC']], manifold[:, 1][labels == LABELS['HC']],
+    #                     c=normalized_values.values[labels == LABELS['HC']], s=20, marker='x')  # ,
     scatter = ax.scatter(manifold[:, 0][labels == LABELS['PDOFF']], manifold[:, 1][labels == LABELS['PDOFF']],
-                         c=normalized_values.values[labels == LABELS['PDOFF']], s=20, marker='o')  # ,
+                         c=normalized_values.values[labels == LABELS['PDOFF']], s=20, marker='o', alpha=0.8 )  # ,
     # cmap=cmap)
     # ax.legend(handles=scatter.legend_elements()[0], labels=class_names, loc='upper left')
     # Remove the ticks from
+    # Min and max of the normalized values
+    min_val = normalized_values.min()
+    max_val = normalized_values.max()
+
+    cbaxes = inset_axes(ax, width="30%", height="5%" , loc=1)
+    fig.colorbar(scatter, cax=cbaxes, orientation='horizontal', label=key, ticks=[min_val,max_val])
+
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_title(title)
     ax.set_xlabel('Dimension 1')
     ax.set_ylabel('Dimension 2')
+
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
+
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+
+    print(xlim, ylim)
+
     if show:
         plt.show()
     return fig, ax
@@ -262,25 +344,43 @@ def plot_latent_neighborhood(features, batch, class_names, filename='', show=Fal
     """
     tsne = TSNE(n_components=2, perplexity=30)
     manifold = tsne.fit_transform(features.detach())
-    fig, _ = separate_latent_space_by_attr(manifold, batch.y, batch.s, class_names, SACCADE.keys(),
-                                           title='Latent Representation of Test Set')
+    fig, _ = separate_latent_space_by_attr(manifold, batch.y, batch.s, class_names, SACCADE.keys(), title='Latent Representation of Test Set')
 
-    fig, ax = visualize_latent_space(manifold, batch.y, class_names, show=False,
-                                     title='Latent Representation of Test Set')
-
-    if scores is not None:
-        fig, ax = visualize_latent_space(manifold, scores, class_names, show=False,
-                                         title='Latent Representation of Test Set', cmap='viridis')
-
-    if metadata is not None:
-        fig, ax = t_sne_subject_metadata(manifold, batch.y, batch.z, class_names, metadata, show=True,
-                                         title='Latent Representation of Test Set', key=key)
+    fig, ax, xlim, ylim = visualize_latent_space(manifold, batch.y, class_names, show=False, title='Subject Label')
 
     plt.tight_layout()
     if len(filename):
-        fig.savefig(f'{figure_path.joinpath(filename)}.svg', format='svg', dpi=1200)
+        fig.savefig(f'{figure_path.joinpath(filename)}_classes.pdf', format='pdf', dpi=1200)
     if show:
         plt.show()
+
+    fig, ax, xlim, ylim = visualize_latent_space_medication(manifold, batch.y, batch.g, class_names, show=False, title='Subject Label', cmap='viridis')
+
+    plt.tight_layout()
+    if len(filename):
+        fig.savefig(f'{figure_path.joinpath(filename)}_medication.pdf', format='pdf', dpi=1200)
+    if show:
+        plt.show()
+
+    if scores is not None:
+        fig, ax, xlim, ylim = visualize_latent_space(manifold, scores, class_names, show=False,
+                                         title="Model's Confidence Score (a.u.)", cmap='viridis')
+        plt.tight_layout()
+        if len(filename):
+            fig.savefig(f'{figure_path.joinpath(filename)}_model_scores.pdf', format='pdf', dpi=1200)
+        if show:
+            plt.show()
+
+    if metadata is not None:
+        print(xlim, ylim)
+        fig, ax = t_sne_subject_metadata(manifold, batch.y, batch.z, class_names, metadata, show=True,
+                                            title = 'Disease Duration (years)', # 'Disease Duration (years)'
+                                            key=key, xlim=xlim, ylim=ylim)
+
+        if len(filename):
+            fig.savefig(f'{figure_path.joinpath(filename)}_metadata.pdf', format='pdf', dpi=1200)
+        if show:
+            plt.show()
 
 
 def grouped_bar_chart():

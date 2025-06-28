@@ -94,107 +94,107 @@ from scipy.signal import welch
 
 #     return rocket_model, classifier, X_train_scaled_transform, X_test_scaled_transform, full_model_score_train, full_model_score_test
 
-def feature_detachment(classifier,
-                       X_train: np.ndarray,
-                       X_test: np.ndarray,
-                       y_train: np.ndarray,
-                       y_test: np.ndarray,
-                       drop_percentage: float = 0.05,
-                       total_number_steps: int = 150,
-                       verbose=True):
-    """
-    Applies Sequential Feature Detachment (SFD) to a feature matrix.
+# def feature_detachment(classifier,
+#                        X_train: np.ndarray,
+#                        X_test: np.ndarray,
+#                        y_train: np.ndarray,
+#                        y_test: np.ndarray,
+#                        drop_percentage: float = 0.05,
+#                        total_number_steps: int = 150,
+#                        verbose=True):
+#     """
+#     Applies Sequential Feature Detachment (SFD) to a feature matrix.
 
-    Parameters
-    ----------
-    classifier: sklearn model
-        Ridge linear classifier trained on the full training dataset.
-    X_train: numpy array
-        Training features matrix, a 2d array of shape (# instances, # features).
-    X_test: numpy array
-        Test features matrix, a 2d array of shape (# instances, # features).
-    y_train: numpy array
-        Training labels
-    y_test: nparray
-        Test labels
-    drop_percentage: float
-        Proportion of features drop at each step of the detachment process
-    total_number_steps: int
-        Total number of detachment steps performed during SFD
-    verbose: bool
-        If true, prints a message at the end of each step
+#     Parameters
+#     ----------
+#     classifier: sklearn model
+#         Ridge linear classifier trained on the full training dataset.
+#     X_train: numpy array
+#         Training features matrix, a 2d array of shape (# instances, # features).
+#     X_test: numpy array
+#         Test features matrix, a 2d array of shape (# instances, # features).
+#     y_train: numpy array
+#         Training labels
+#     y_test: nparray
+#         Test labels
+#     drop_percentage: float
+#         Proportion of features drop at each step of the detachment process
+#     total_number_steps: int
+#         Total number of detachment steps performed during SFD
+#     verbose: bool
+#         If true, prints a message at the end of each step
 
-    Returns
-    -------
-    percentage_vector: numpy array
-        Array with the the model size at each detachment step (proportion of the original full model)
-    score_list_train: numpy array
-        Balanced accuraccy on the training set at each detachment step
-    score_list_test: numpy array
-        Balanced accuraccy on the test set at each detachment step
-    feature_importance_matrix: numpy array
-        A 2d array of shape (# steps, # features) with the importance of the features at each detachment step
-    """
+#     Returns
+#     -------
+#     percentage_vector: numpy array
+#         Array with the the model size at each detachment step (proportion of the original full model)
+#     score_list_train: numpy array
+#         Balanced accuraccy on the training set at each detachment step
+#     score_list_test: numpy array
+#         Balanced accuraccy on the test set at each detachment step
+#     feature_importance_matrix: numpy array
+#         A 2d array of shape (# steps, # features) with the importance of the features at each detachment step
+#     """
 
-    # Check if training set is normalized
-    mean_vector = X_train.mean(axis=0)
-    zeros_vector = np.zeros_like(mean_vector)
-    nomalized_condition = np.isclose(mean_vector, zeros_vector, atol=1e-02)
-    assert all(nomalized_condition), "The feature matrix should be normalized before training classifier."
+#     # Check if training set is normalized
+#     mean_vector = X_train.mean(axis=0)
+#     zeros_vector = np.zeros_like(mean_vector)
+#     nomalized_condition = np.isclose(mean_vector, zeros_vector, atol=1e-02)
+#     assert all(nomalized_condition), "The feature matrix should be normalized before training classifier."
 
-    # Alpha and feature importance from full model
-    aplha_value = classifier.alpha
-    feature_importance_full = np.abs(classifier.coef_)[0, :]
+#     # Alpha and feature importance from full model
+#     aplha_value = classifier.alpha
+#     feature_importance_full = np.abs(classifier.coef_)[0, :]
 
-    # Define percentage vector
-    keep_percentage = 1 - drop_percentage
-    powers_vector = np.arange(total_number_steps)
-    percentage_vector = np.power(keep_percentage, powers_vector)
+#     # Define percentage vector
+#     keep_percentage = 1 - drop_percentage
+#     powers_vector = np.arange(total_number_steps)
+#     percentage_vector = np.power(keep_percentage, powers_vector)
 
-    # Define lists and matrices
-    score_list_train = []
-    score_list_test = []
-    feature_importance = np.copy(feature_importance_full)
-    feature_importance_matrix = np.zeros((len(percentage_vector), len(feature_importance_full)))
-    feature_selection_matrix = np.full((len(percentage_vector), len(feature_importance_full)), False)
+#     # Define lists and matrices
+#     score_list_train = []
+#     score_list_test = []
+#     feature_importance = np.copy(feature_importance_full)
+#     feature_importance_matrix = np.zeros((len(percentage_vector), len(feature_importance_full)))
+#     feature_selection_matrix = np.full((len(percentage_vector), len(feature_importance_full)), False)
 
-    # Begin iterative feature selection
-    for count, per in enumerate(percentage_vector):
+#     # Begin iterative feature selection
+#     for count, per in enumerate(percentage_vector):
 
-        # Cumpute mask for selected features
-        drop_percentage = 1 - per
-        limit_value = np.quantile(feature_importance, drop_percentage)
-        selection_mask = feature_importance >= limit_value
+#         # Cumpute mask for selected features
+#         drop_percentage = 1 - per
+#         limit_value = np.quantile(feature_importance, drop_percentage)
+#         selection_mask = feature_importance >= limit_value
 
-        # Apply mask
-        X_train_subsampled = X_train[:, selection_mask]
-        X_test_subsampled = X_test[:, selection_mask]
+#         # Apply mask
+#         X_train_subsampled = X_train[:, selection_mask]
+#         X_test_subsampled = X_test[:, selection_mask]
 
-        # Train model for selected features
-        step_classifier = RidgeClassifier(alpha=aplha_value)
-        step_classifier.fit(X_train_subsampled, y_train)
+#         # Train model for selected features
+#         step_classifier = RidgeClassifier(alpha=aplha_value)
+#         step_classifier.fit(X_train_subsampled, y_train)
 
-        # Compute scores for train and test sets
-        # TODO add option to compute the non-balanced accuracy
-        avg_score_train = step_classifier.score(X_train_subsampled, y_train)
-        avg_score_test = step_classifier.score(X_test_subsampled, y_test)
-        score_list_train.append(avg_score_train)
-        score_list_test.append(avg_score_test)
+#         # Compute scores for train and test sets
+#         # TODO add option to compute the non-balanced accuracy
+#         avg_score_train = step_classifier.score(X_train_subsampled, y_train)
+#         avg_score_test = step_classifier.score(X_test_subsampled, y_test)
+#         score_list_train.append(avg_score_train)
+#         score_list_test.append(avg_score_test)
 
-        # Save current feature importance and selected features
-        feature_importance_matrix[count, :] = feature_importance
-        feature_selection_matrix[count, :] = selection_mask
+#         # Save current feature importance and selected features
+#         feature_importance_matrix[count, :] = feature_importance
+#         feature_selection_matrix[count, :] = selection_mask
 
-        # Kill masked features
-        feature_importance[~selection_mask] = 0
-        feature_importance[selection_mask] = np.abs(step_classifier.coef_)[0, :]
+#         # Kill masked features
+#         feature_importance[~selection_mask] = 0
+#         feature_importance[selection_mask] = np.abs(step_classifier.coef_)[0, :]
 
-        if verbose:
-            print("Step {} out of {}".format(count + 1, total_number_steps))
-            print('{:.3f}% of features used'.format(100 * per))
+#         if verbose:
+#             print("Step {} out of {}".format(count + 1, total_number_steps))
+#             print('{:.3f}% of features used'.format(100 * per))
 
-    return percentage_vector, np.asarray(score_list_train), np.asarray(
-        score_list_test), feature_importance_matrix, feature_selection_matrix
+#     return percentage_vector, np.asarray(score_list_train), np.asarray(
+#         score_list_test), feature_importance_matrix, feature_selection_matrix
 
 
 def select_optimal_model(percentage_vector,
@@ -410,3 +410,139 @@ def plot_power_spectrum(center_frequencies, power_spectrum):
     plt.title('Power Spectrum')
     plt.grid(True)
     plt.show()
+
+
+
+def feature_detachment(classifier,
+                        X_train: np.ndarray,
+                        X_test: np.ndarray,
+                        y_train: np.ndarray,
+                        y_test: np.ndarray,
+                        drop_percentage: float = 0.05,
+                        total_number_steps: int = 150,
+                        multilabel_type: str = "norm",
+                        verbose = True):
+    """
+    Applies Sequential Feature Detachment (SFD) to a feature matrix.
+
+    Parameters
+    ----------
+    classifier: sklearn model
+        Ridge linear classifier trained on the full training dataset.
+    X_train: numpy array
+        Training features matrix, a 2d array of shape (# instances, # features).
+    X_test: numpy array
+        Test features matrix, a 2d array of shape (# instances, # features).
+    y_train: numpy array
+        Training labels
+    y_test: nparray
+        Test labels
+    drop_percentage: float
+        Proportion of features drop at each step of the detachment process
+    total_number_steps: int
+        Total number of detachment steps performed during SFD
+    verbose: bool
+        If true, prints a message at the end of each step
+
+    Returns
+    -------
+    percentage_vector: numpy array
+        Array with the the model size at each detachment step (proportion of the original full model)
+    score_list_train: numpy array
+        Balanced accuraccy on the training set at each detachment step
+    score_list_test: numpy array
+        Balanced accuraccy on the test set at each detachment step
+    feature_importance_matrix: numpy array
+        A 2d array of shape (# steps, # features) with the importance of the features at each detachment step
+    """
+
+    # Check if training set is normalized
+    mean_vector = X_train.mean(axis=0)
+    zeros_vector = np.zeros_like(mean_vector)
+    nomalized_condition = np.isclose(mean_vector, zeros_vector,atol=1e-02)
+    # assert all(nomalized_condition), "The feature matrix should be normalized before training classifier."
+    total_feats = X_train.shape[1]
+
+    # Feature importance from full model
+    
+    # Check if problem is multilabel
+    if np.shape(classifier.coef_)[0]>1:
+        if multilabel_type == "norm":
+            feature_importance_full = np.linalg.norm(classifier.coef_[:,:],axis=0,ord=2)
+        elif multilabel_type == "max":
+            feature_importance_full = np.linalg.norm(classifier.coef_[:,:],axis=0,ord=np.inf)
+        elif multilabel_type == "avg":
+            feature_importance_full = np.linalg.norm(classifier.coef_[:,:],axis=0,ord=1)
+        else:
+            raise ValueError('Invalid multilabel_type argument. Choose from: "norm", "max", or "avg".')
+    else:
+        feature_importance_full = np.abs(classifier.coef_)[0,:]
+
+    # Define percentage vector
+    keep_percentage = 1-drop_percentage
+    powers_vector = np.arange(total_number_steps)
+    percentage_vector_unif = np.power(keep_percentage, powers_vector)
+
+    num_feat_per_step = np.unique((percentage_vector_unif*total_feats).astype(int))
+    num_feat_per_step = num_feat_per_step[::-1]
+    num_feat_per_step = num_feat_per_step[num_feat_per_step>0]
+    percentage_vector = num_feat_per_step/total_feats
+
+    # Define lists and matrices
+    score_list_train = []
+    score_list_test = []
+    feature_importance = np.copy(feature_importance_full)
+    feature_importance_matrix = np.zeros((len(percentage_vector),len(feature_importance_full)))
+    feature_selection_matrix = np.full((len(percentage_vector),len(feature_importance_full)), False)
+
+    # Begin iterative feature selection
+    for count, feat_num in enumerate(num_feat_per_step):
+
+        per = percentage_vector[count]
+
+        # Cumpute mask for selected features
+        drop_features = total_feats - feat_num
+
+        selected_idxs = np.argsort(feature_importance)[drop_features:]
+        selection_mask = np.full(total_feats, False)
+        selection_mask[selected_idxs] = True
+
+        # Apply mask
+        X_train_subsampled = X_train[:,selection_mask]
+        X_test_subsampled = X_test[:,selection_mask]
+
+        # Train model for selected features
+        classifier.fit(X_train_subsampled, y_train)
+
+        # Compute scores for train and test sets
+        avg_score_train = classifier.score(X_train_subsampled, y_train)
+        avg_score_test = classifier.score(X_test_subsampled, y_test)
+        score_list_train.append(avg_score_train)
+        score_list_test.append(avg_score_test)
+
+        # Kill masked features
+        feature_importance[~selection_mask] = 0
+
+        # Compute feature importance taking into account multilabel type
+        if np.shape(classifier.coef_)[0]>1:
+            if multilabel_type == "norm":
+                feature_importance[selection_mask] = np.linalg.norm(classifier.coef_[:,:],axis=0,ord=2)
+            elif multilabel_type == "max":
+                feature_importance[selection_mask] = np.linalg.norm(classifier.coef_[:,:],axis=0,ord=np.inf)
+            elif multilabel_type == "avg":
+                feature_importance[selection_mask] = np.linalg.norm(classifier.coef_[:,:],axis=0,ord=1)
+            else:
+                raise ValueError('Invalid multilabel_type argument. Choose from: "norm", "max", or "avg".')
+        else:
+            feature_importance[selection_mask] = np.abs(classifier.coef_)[0,:]
+
+        if verbose==True:
+            print("Step {} out of {}".format(count+1, total_number_steps))
+            print('{:.3f}% of features used'.format(100*per))
+
+        # Save current feature importance and selected features
+        feature_importance_matrix[count,:] = feature_importance
+        feature_selection_matrix[count,:] = selection_mask
+        # print('Im here')
+
+    return percentage_vector, np.asarray(score_list_train), np.asarray(score_list_test), feature_importance_matrix, feature_selection_matrix
