@@ -1,5 +1,7 @@
 # Multivariate Time-Series Classification for Parkinson’s Diagnosis
 
+This repository hosts the code used to produce the results presented in our paper titled "Deep Learning Models Accurately Classify Parkinson's Disease from Eye-Tracking Fixation Data", published in Nature Scientific Reports.
+
 ## Table of Contents
 
 1. [Development Setup](#setup)
@@ -28,8 +30,8 @@ conda env update --file conda/[OS].yaml --prune`
 
 ### Datasets
 
-We use a private dataset from the Karolinska Institute for our experiments. For details, see our paper **todo**.
-For access to the data, contact the authors.
+We use a private dataset from the Karolinska Institute for our experiments. For details, see our paper.
+For information regarding access to the data, refer to the section "Data Availability" in our paper.
 
 ### Logging
 
@@ -77,5 +79,6 @@ run the various experiments by their respective entrypoints in the `src/entrypoi
 
 - Classification with ROCKET and classic ML classifiers `src/entrypoints/rocket.py`
 - Classification with InceptionTime `src/entrypoints/inception.py`
+- And more...
 
  
